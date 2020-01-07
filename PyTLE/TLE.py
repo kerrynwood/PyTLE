@@ -145,8 +145,13 @@ tle_fields = {'line1': {
 # NOTE: pre-pend all non-data fields with "_".  Any class field that does NOT have this
 # as a starting char will be automatically exported as data to the DB
 class tle_class:
-    """ A class to parse and store two-line element set data from the NORAD files """
-    """ This currently does NO error checking (even checksum).  Next version"""
+    """ A class to parse and store two-line element set data from the NORAD files 
+        - we will store units as they are stored in the TLE (i.e. degrees)
+        - dates are broken into epoch years and days
+        - this is a BASIC serializer: you'll have to feed it the right units
+
+        This currently does NO error checking (even checksum).  Next version
+    """ 
 
     def _set_tle_fields(self):
         for key in tle_fields['line1'] : setattr( self, key, None )
