@@ -21,7 +21,18 @@ def year_day_to_datetime( YEAR, DAY ):
 	'''year_day_to_datetime( year, day ):
 		take TLE formatted date YYDDD.DDDDDD and return a datetime object
 		year : int
-		day  : float'''
+		day  : float
+
+            # ------------- from stackoverflow ---- https://stackoverflow.com/questions/34849083/convert-tle-times-decimal-days-to-seconds-after-epoch
+            # get year 2 digit and floating seconds days 
+            y_d, nbs = "16012.375".split('.') 
+
+            # parse to datetime (since midnight and add the seconds) %j Day of the year as a zero-padded decimal number.
+            d = datetime.datetime.strptime(y_d, "%y%j") + datetime.timedelta(seconds=float("." + nbs) * 24 * 60 * 60)
+            # 1.0 => 1 day
+            # from time tuple get epoch time. 
+            time.mktime(d.timetuple())r
+                '''
 	if 57 <= YEAR <= 99: YEAR += 1900
 	if 0 <= YEAR <= 56: YEAR += 2000
 
