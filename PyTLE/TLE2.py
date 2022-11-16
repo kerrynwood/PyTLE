@@ -1,10 +1,10 @@
 import re
 import datetime
+import numpy as np
 import math
 import sys
 from . import formatExceptionInfo
 from . import tle_epoch
-from astropy.time import Time as astro_date
 
 from sgp4.ext import rv2coe
 from sgp4.earth_gravity import wgs72
@@ -17,7 +17,8 @@ to_alpha = {10: 'A', 11: 'B', 12: 'C', 13: 'D', 14: 'E', 15: 'F', 16: 'G', 17: '
 def alpha5(s):
     # from Brandon Rhodes' SGP4 library
     ''' compute an INTEGER from a TLE number string'''
-    if not s[0].isalpha(): return int(s)
+    if not s[0].isalpha():
+        return int(s)
     c = s[0]
     return (from_alpha[c] * 10000 ) + int(s[1:])
 
@@ -32,22 +33,16 @@ def integer5(I):
     return to_alpha[ int(lkup) ] + intstr[2:][0:5]
 
 
-# NOTE! As of 2013/08/06, SpaceTrack is outputting records that are somewhat malformed.  Sometimes they have a non-standard NORAD identifier,
-# and do not include a checksum.  Since we don't check checksum anyways,
-# ignore it.  (Commented out in fields dictionary below).
-
 # for SGP4 satrec
-deg2rad  =   math.pi / 180.0         #    0.0174532925199433
-xpdotp   =  1440.0 / (2.0 *math.pi)  #  229.1831180523293
-# expoRE = re.compile("([\+\-\ ]?[0-9]{4,6})([\+\-]?[0-9]{1,2})")
+DEG2RAD  = math.pi / 180.0         #    0.0174532925199433
+XPDOTP   = 1440.0 / (2.0 * math.pi)  #  229.1831180523293
 launch_year_re = re.compile(r'(\d{2})\d{2,3} *')
 launch_number_re = re.compile(r'\d{2}(\d{2,3}) *')
 launch_piece_re = re.compile(r'\d{2}\d{2,3}.*([A-Z]{1,3})')
 
 # -----------------------------------------------------------------------------------------------------
 def generate_checksum(line):
-    digits = sum(map(lambda x: int(x), filter(
-        lambda y: re.match('[0-9]{1}', y), [z for z in line])))
+    digits = [int(X) for X in filter( str.isdigit, line )]
     minus = line.count('-')
     rV = str(digits + minus)
     return rV[-1]
@@ -68,33 +63,44 @@ def process_expo_format(string):
     mant = string[1:-2]
     exp = string[-2:]
     return neg * float("0.{}".format(mant)) * (10 ** int(exp))
-    #return neg * float('0.%s' % mant) * (10 ** int(exp))
-
-
-# -----------------------------------------------------------------------------------------------------
-catDate = re.compile("([0-9]{4})_([0-9]{3})")
-def get_catalog_date(STR):
-    R = catDate.search(STR)
-    if not R or not len(R.groups()) == 2:
-        print("get_catalog_date: could not pull info from", STR)
-        return int(0)
-    try: retVal = int(R.groups()[0] + R.groups()[1])
-    except:
-        print("get_catalog_date: could not reformat info:", Y, D)
-        return int(0)
-    return retVal
 
 # -----------------------------------------------------------------------------------------------------
 def get_tle_datatype(VAL, TYPE):
-    print('typetest',VAL,TYPE)
-    if TYPE == 'float': return float(VAL)
-    if TYPE == 'int': return int(VAL)
-    if TYPE == 'expo': return process_expo_format(VAL)
-    if TYPE == 'string':return str(VAL)
-    if TYPE == 'eccentricity':  return float(str('0.%s' % VAL))
-    if TYPE == "launch_year":  return int(launch_year_re.match(VAL).groups()[0])
-    if TYPE == "launch_number": return int(launch_number_re.match(VAL).groups()[0])
-    if TYPE == "launch_piece": return VAL
+    if TYPE == 'float':
+        try: return float(VAL)
+        except: print("Could not convert", VAL, "to type:", TYPE)
+
+    if TYPE == 'int':
+        try: return int(VAL)
+        except: print("Could not convert", VAL, "to type:", TYPE)
+
+    if TYPE == 'expo':
+        return process_expo_format(VAL)
+    # except: print "Could not convert", VAL, "to type:", TYPE
+
+    if TYPE == 'string':
+        try: return str(VAL)
+        except: print("Could not convert", VAL, "to type:", TYPE)
+
+    if TYPE == 'eccentricity':
+        # put in the implicit floating point notation
+            try: return float(str('0.%s' % VAL))
+            except: print("Could not convert", VAL, "to type:", TYPE)
+
+    if TYPE == "launch_year":
+        try: return int(launch_year_re.match(VAL).groups()[0])
+        except:
+            print("Could not convert", VAL, "to launch_year")
+
+    if TYPE == "launch_number":
+        try: return int(launch_number_re.match(VAL).groups()[0])
+        except: print("Could not convert", VAL, "to launch_number")
+
+    if TYPE == "launch_piece":
+        return VAL
+    # try: return launch_piece_re.match( VAL ).groups()[0]
+            # except: print "Could not convert", VAL, "to launch_piece"
+
     return None
 
 ##########################################################################
@@ -139,12 +145,17 @@ class tle_class:
     All field units are native to TLE's (degrees, minutes)
     '''
 
-    def __init__(self, line1=None, line2=None, catalogName='N/A'):
+    def __init__(self, line1=None, line2=None ):
         self._clear()
-        if line1 and line2:
-            self.from_lines( line1, line2 )
+        if line1 == None or line2 == None: 
+            self._set_defaults()
             return
-        self._set_defaults()
+        self.from_lines( line1, line2 )
+
+    def _clear(self):
+        self.error = 0
+        self._set_tle_fields()
+        self._epoch_date = None
 
     def _set_tle_fields(self):
         for key in tle_fields['line1'] : setattr( self, key, None )
@@ -154,22 +165,22 @@ class tle_class:
         for key in tle_fields['line1'] : setattr( self, key, tle_fields['line1'][key]['default'])
         for key in tle_fields['line2'] : setattr( self, key, tle_fields['line2'][key]['default'])
 
-    def _clear(self):
-        self.error = 0
-        self._set_tle_fields()
-        self.catalog_file = None
-        self._astro_date = None
-
     def _parse_line(self, LINE, DATA):
+        tLine = DATA.strip()
         setattr(self, LINE, DATA.strip())
         for Z in tle_fields[LINE].keys():
             field_spec = tle_fields[LINE][Z]
             begin,end,dtype = field_spec['B'], field_spec['E'], field_spec['T']
-            try: newVal = get_tle_datatype(DATA[begin:end],dtype)
-            except Exception as e:
-                print('error parsing {} {} {}'.format( Z, line, e ))
-                continue
-            print('setting {} to {}'.format(Z,newVal))
+            try:
+                newVal = get_tle_datatype(DATA[begin:end],dtype)
+            except:
+                self.error = 1
+                self._err_msg("exception on line: {} field: {}".format(LINE,Z) )
+                return
+            if newVal == None:
+                 self._err_msg('get_tle_datatype failed on field {}, data: {}, type: {}'.format( Z, begin, end, dtype ) )
+                 self.error = 1
+                 return
             setattr(self, Z, newVal)
 
     def _derive_dates(self):
@@ -182,7 +193,7 @@ class tle_class:
             self.error = 1
         if self.epoch_year <= 57: self.epoch_full_year = self.epoch_year + 2000
         else:   self.epoch_full_year = self.epoch_year + 1900
-        self._astro_date = astro_date(tle_epoch.year_day_to_datetime( self.epoch_year, self.epoch_day) )
+        self._epoch_date = astro_date(tle_epoch.year_day_to_datetime(self.epoch_year, self.epoch_day))
 
     def set_date( self , DT ):
         try:
@@ -195,40 +206,31 @@ class tle_class:
             self._err_msg('set_date: could not handle {}'.format(DT))
             return
 
-    def printFields( self ):
-        A = str()
-        if self.catalog_file != None: A = "tle_class (%s)" % self.catalog_file
-        else: A = ''
-        for I in self.__dict__.keys():
-            A = A + str(I) + " ---> " + str(self.__dict__[I]) + "\n"
-        return A
-
     def __str__( self ):
         return "{}\n{}".format( self._generate_new_line1(), self._generate_new_line2() )
-
 
     def _struct_print( self ):
         print (self.sat_no, self.classification, self.launch_year, self.launch_number, self.launch_place, self.epoch_year, self.epoch_day, self.mean_motion_1, self.mean_motion_2, self.bstar, self.ephem_type, self.element_number, self.line1_checksum )
 
-    def __lt__( se+lf, other ):
+    def __lt__( self, other ):
         if not isinstance( other, tle_class ): return NotImplemented
-        return self._astro_date.to_jday() < other._astro_date.to_jday() 
+        return self._epoch_date.to_jday() < other._epoch_date.to_jday()
 
     def __gt__( self, other ):
         if not isinstance( other, tle_class ): return NotImplemented
-        return self._astro_date.to_jday() > other._astro_date.to_jday() 
+        return self._epoch_date.to_jday() > other._epoch_date.to_jday()
 
     def __ge__( self, other ):
         if not isinstance( other, tle_class ): return NotImplemented
-        return self._astro_date.to_jday() >= other._astro_date.to_jday() 
+        return self._epoch_date.to_jday() >= other._epoch_date.to_jday()
 
     def __le__( self, other ):
         if not isinstance( other, tle_class ): return NotImplemented
-        return self._astro_date.to_jday() <= other._astro_date.to_jday() 
+        return self._epoch_date.to_jday() <= other._epoch_date.to_jday()
 
     def __eq__( self, other ):
         if not isinstance( other, tle_class ): return NotImplemented
-        return self._astro_date.to_jday() == other._astro_date.to_jday() 
+        return self._epoch_date.to_jday() == other._epoch_date.to_jday()
 
     def _check_lines( self ):
         while len(self.line1) < 69 : self.line1+='0'
@@ -349,8 +351,8 @@ class tle_class:
         if self.epoch_full_year >= 2000: self.epoch_year = self.epoch_full_year - 2000
         if self.epoch_full_year < 2000: self.epoch_year = self.epoch_full_year - 1900
         self.epoch_day = satrec.epochdays
-        self.mean_motion_1 = satrec.ndot * (xpdotp*1440.0)          # <--- converted
-        self.mean_motion_2 = satrec.nddot *(xpdotp*1440.*1440.)     # <--- converted
+        self.mean_motion_1 = satrec.ndot * (XPDOTP * 1440.0)          # <--- converted
+        self.mean_motion_2 = satrec.nddot *(XPDOTP * 1440. * 1440.)     # <--- converted
         self.bstar = satrec.bstar
         try: self.ephem_type = int( satrec.ephtype )
         except: self.ephem_type = 0
@@ -361,7 +363,7 @@ class tle_class:
         self.eccentricity = satrec.ecco
         self.argument = math.degrees( satrec.argpo )
         self.mean_anomaly = math.degrees( satrec.mo )
-        self.mean_motion = satrec.mdot * xpdotp                 # <--- converted
+        self.mean_motion = satrec.mdot * XPDOTP                 # <--- converted
         try: self.rev_number = int(satrec.revnum)
         except: self.rev_number = 0
         return self
@@ -376,7 +378,7 @@ def testTLE():
     # have SGP4 parse that TLE
     satrec = twoline2rv( L1, L2, EG.wgs72 )
     # build our local class from that line
-    A = tle_class( L1, L2 )
+    A = tle_class( L1, L2, catalogName='blah')
     # build a local class from the satrec
     B = tle_class()
     B.from_sgp4_satrec( satrec )

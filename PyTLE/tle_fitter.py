@@ -41,13 +41,13 @@ class tle_fitter( PyTLE.TLE ):
     def toArray( self ):
         '''
         return an array that represents the TLE orbital parameters
-        mean_motion
-        ecc
-        inclination
-        argument
-        raan
-        mean_anomaly
-        bstar  <--- return in raw form
+            mean_motion
+            ecc
+            inclination
+            argument
+            raan
+            mean_anomaly
+            bstar  <--- return in raw form
         '''
         # these values should never be negative or wrapped
         if self.override_bstar == None: bstar = self.bstar
