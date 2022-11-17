@@ -41,13 +41,13 @@ class tle_fitter( PyTLE.TLE ):
     def toArray( self ):
         '''
         return an array that represents the TLE orbital parameters
-            mean_motion
-            ecc
-            inclination
-            argument
-            raan
-            mean_anomaly
-            bstar  <--- return in raw form
+        mean_motion
+        ecc
+        inclination
+        argument
+        raan
+        mean_anomaly
+        bstar  <--- return in raw form
         '''
         # these values should never be negative or wrapped
         if self.override_bstar == None: bstar = self.bstar
@@ -66,17 +66,15 @@ class tle_fitter( PyTLE.TLE ):
     def fromArray( self, X ):
         '''
         take the array mapped from toArray and turn it back into this data structure
-        0: mean_motion
-        1: ecc
-        2: inclination
-        3: argument
-        4: raan
-        5: mean_anomaly
+        mean_motion
+        ecc
+        inclination
+        argument
+        raan
+        mean_anomaly
         bstar  <--- return in raw form
         '''
         # all these should be circular
-        X0 = self.circ(X[0]) # mean_motion
-        X2 = self.circ(X[2]) # inclination
         X3 = self.circ(X[3]) # argument
         X4 = self.circ(X[4]) # ra
         X5 = self.circ(X[5]) # mean_anomaly
@@ -113,7 +111,7 @@ class tle_fitter( PyTLE.TLE ):
 
 ###########################################################################################
 def rmsval( V ):
-    try: return np.sqrt( np.sum( V ** 2 ) / len(V) )
+    try: return np.sqrt( np.mean( V ** 2 ) ) * 1e3
     except: return np.inf
 
 ###########################################################################################
@@ -130,8 +128,8 @@ def compare_TLE_ephem( dates, ephem, tle_fitter, rms = False ):
     L1,L2      = tle_fitter.getLines()
     try: prop = twoline2rv( L1, L2, wgs72 )
     except:
-        if rms: return np.inf
-        else: return np.inf * np.ones(N)
+        if rms: return np.inf(N)
+        else: return np.inf
     tle_epoch  = prop.jdsatepoch
     offset     = np.array( [ D.jd - tle_epoch for D in dates ] ) * 1440.  # SGP4 wants minutes
     testpos, testvel  = zip( *[sgp4prop( prop, O ) for O in offset ] )

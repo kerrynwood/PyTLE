@@ -210,7 +210,7 @@ class tle_class:
     def _struct_print( self ):
         print (self.sat_no, self.classification, self.launch_year, self.launch_number, self.launch_place, self.epoch_year, self.epoch_day, self.mean_motion_1, self.mean_motion_2, self.bstar, self.ephem_type, self.element_number, self.line1_checksum )
 
-    def __lt__( se+lf, other ):
+    def __lt__( self, other ):
         if not isinstance( other, tle_class ): return NotImplemented
         return self._astro_date.to_jday() < other._astro_date.to_jday() 
 
