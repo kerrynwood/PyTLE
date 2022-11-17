@@ -1,10 +1,15 @@
+from datetime import datetime, timedelta
 import numpy as np
 from RefactorTLE_working import TLE
+import jdcal
 
 
 class tle_fitter( TLE ):
-    def __init__(self, **kwargs):
-        super().__init__( **kwargs )
+    def __init__(self, *args, **kwargs):
+        super().__init__( *args, **kwargs )
+        self.allfields     = ['mean_motion','eccentricity','inclination','argp','raan','mean_anomaly',
+                               'mm_dot','mm_dot_dot','bstar']
+
         self.default_fields = ['mean_motion','eccentricity','inclination','argp','raan','mean_anomaly',
                                'mm_dot','mm_dot_dot','bstar']
 
@@ -36,18 +41,80 @@ class tle_fitter( TLE ):
             'bstar'         : lambda X: np.interp( X % 1, [0,1], [-1,1])
         }
 
-    def to_vec(self):
+    def to_array(self):
         out = np.zeros( len(self._optfields) )
-        for i,f in enumerate(self._optfields): out = getattr( self, f )
+        for i,f in enumerate(self._optfields): out[i] = getattr( self, f )
         return out
 
-    def from_vec(self, vec):
+    def from_array(self, vec):
         assert len(vec) == len(self._optfields)
         for i,f in enumerate(self._optfields): setattr(self,f,vec[i])
         return self
 
+
+    def ephem_fit( self, dates, ephem_matrix ):
+        ''' you must initialize this TLE first or it will seed with default values'''
+        # do the imports here so we can use the class as just a parser without these dependencies (if we want to)
+        import scipy.optimize
+        from sgp4.earth_gravity import wgs72
+        from sgp4.io import twoline2rv
+        from sgp4.propagation import sgp4 as sgprop
+        offsets = np.array( [ (D-self.epoch).total_seconds() / 60 for D in dates ] )
+        
+        def fit_fcn( X, offset_mins, true_eph ):
+            self.from_array(X)
+            try: 
+                testtle = twoline2rv( self.line1, self.line2, wgs72 )
+                testeph = np.vstack( [np.hstack( sgprop(testtle,D)) for D in offset_mins] )
+            except Exception as e:
+                print(e)
+                return np.inf
+            
+            diffpos = testeph[:,0:3] - true_eph[:,0:3]
+            # return the rms value
+            rmsval = np.sqrt( np.mean( np.linalg.norm(diffpos,axis=1) ** 2 ) )
+            print(rmsval,end='\r')
+            return rmsval
+
+
+        opt_result = scipy.optimize.minimize( 
+                        fit_fcn, 
+                        self.to_array(), 
+                        args=( offsets, ephem_matrix) , 
+                        method='Nelder-Mead',
+                        options = { 
+                            'fatol' : 1. } )
+        print()
+        if opt_result.success:
+            self.from_array( opt_result.x )
+            return self, opt_result
+
+        
+
+# =====================================================================================================
 if __name__ == '__main__':
-    A = tle_fitter(fields=['mean_motion'])
-    print(A)
-    print(A.to_vec())
-    print(A.from_vec([10]))
+    from sgp4.earth_gravity import wgs72
+    from sgp4.io import twoline2rv
+    from sgp4.propagation import sgp4 as sgprop
+    import astropy.time
+    import astropy.units as u
+
+
+    # Aerocube 12A
+    L1 = '1 43556U 18046C   22321.55519027  .00025005  00000+0  49749-3 0  9993'
+    L2 = '2 43556  51.6329 154.1269 0008144 222.8163 137.2191 15.46745497242947'
+    # test ephemeris
+    tle = twoline2rv( L1, L2, wgs72 )
+    tledate = astropy.time.Time( tle.jdsatepoch, format='jd' )
+    print(jdcal(tledate.datetime))
+    
+    dates = tledate + np.arange(0,1440*5,15) * u.min
+    mins  = (dates - tledate).to_value( u.min )
+    eph = np.vstack( [np.hstack( sgprop(tle,D)) for D in mins ] )
+    FIT = tle_fitter.fromPV( eph[0,0:3], eph[0,3:], tledate.datetime )
+
+    newtle, res = FIT.ephem_fit( dates.datetime, eph ) 
+    print(newtle.line1)
+    print(L1)
+    print(newtle.line2)
+    print(L2)

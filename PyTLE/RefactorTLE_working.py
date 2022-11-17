@@ -9,6 +9,7 @@ WGS72_MU = wgs72.mu
 from_alpha = {'A': 10, 'B': 11, 'C': 12, 'D': 13, 'E': 14, 'F': 15, 'G': 16, 'H': 17, 'J': 18, 'K': 19, 'L': 20, 'M': 21, 'N': 22, 'P': 23, 'Q': 24, 'R': 25, 'S': 26, 'T': 27, 'U': 28, 'V': 29, 'W': 30, 'X': 31, 'Y': 32, 'Z': 33}
 to_alpha = {10: 'A', 11: 'B', 12: 'C', 13: 'D', 14: 'E', 15: 'F', 16: 'G', 17: 'H', 18: 'J', 19: 'K', 20: 'L', 21: 'M', 22: 'N', 23: 'P', 24: 'Q', 25: 'R', 26: 'S', 27: 'T', 28: 'U', 29: 'V', 30: 'W', 31: 'X', 32: 'Y', 33: 'Z'}
 
+# -----------------------------------------------------------------------------------------------------
 def alpha5(s):
     # from Brandon Rhodes' SGP4 library
     ''' compute an INTEGER from a TLE number string'''
@@ -17,6 +18,7 @@ def alpha5(s):
     c = s[0]
     return (from_alpha[c] * 10000 ) + int(s[1:])
 
+# -----------------------------------------------------------------------------------------------------
 def integer5(I):
     ''' compute a string from an integer '''
     I = int(I)
@@ -58,6 +60,8 @@ def revs_per_day_from_semimajor( a ):
 # -----------------------------------------------------------------------------------------------------
 class TLE:
     def __init__(self, l1=None, l2=None, vec=None, **kwargs):
+        self._userfields = ['satnum','classification','elset_no','revnum']
+
         if l1 and l2: 
             self.parse_line1( l1 )
             self.parse_line2( l2 )
@@ -71,7 +75,6 @@ class TLE:
     def parse_line1(self,l1):
         assert l1.startswith('1')
         self._clean_line(l1)
-        self.line1      = l1
         self.satnum     = int(l1[2:7])
         self.classification    = l1[7]
         self.note       = l1[9:17]
@@ -92,7 +95,6 @@ class TLE:
     def parse_line2(self, l2):
         assert l2.startswith('2')
         self._clean_line(l2)
-        self.line2 = l2
         self.satnum = int(l2[2:7])
         self.inclination = float(l2[8:16])
         self.raan = float(l2[17:25])
@@ -102,7 +104,7 @@ class TLE:
         self.mean_motion = float(l2[52:63])
         self.revnum = int(l2[63:68])
         # self.checksum2    = int( l2[69] )
-        
+
     @property
     def epoch_day(self):
         return (self.epoch - datetime(self.epoch.year,1,1)).total_seconds() / 86400
@@ -129,6 +131,15 @@ class TLE:
     @property
     def apogee(self):
         return self.semimajor_axis * ( 1 + self.eccentricity )
+
+    @property
+    def line1( self ): 
+        return self._generate_new_line1()
+
+    @property
+    def line2( self ): 
+        return self._generate_new_line2()
+
 
     def _generate_new_line1( self ):
         rV = '1 {}{:1} {:8} {:2}{:012.8f} '.format(
@@ -173,7 +184,7 @@ class TLE:
         return newcls
 
     @classmethod
-    def fromPV(cls, P, V, epoch : datetime):
+    def fromPV(cls, P, V, epoch : datetime, **kwargs):
         '''
         fromPV : given state position and velocity (in TEME), build an initial TLE
         note   : this is *not* going to build mean elements
@@ -193,6 +204,9 @@ class TLE:
         newcls.mean_motion = (mm * 86400) / (2 * np.pi)
         newcls.bstar = 0.
         newcls.epoch = epoch
+        # override any parameters that are in our user fields list
+        for k in kwargs:
+            if k in self._userfields: setattr(self,k,kwargs[k] )
         return newcls
 
     def __str__(self): return "\n".join(self.getlines())
