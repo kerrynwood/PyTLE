@@ -107,7 +107,8 @@ class TLE:
 
     @property
     def epoch_day(self):
-        return (self.epoch - datetime(self.epoch.year,1,1)).total_seconds() / 86400
+        return 1 + (self.epoch - datetime(self.epoch.year,1,1)).total_seconds() / 86400
+        #return int( self.epoch.strftime('%j') )
 
     @property
     def epoch_year(self):

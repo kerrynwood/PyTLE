@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 import numpy as np
 from RefactorTLE_working import TLE
-import jdcal
+import julian
 
 
 class tle_fitter( TLE ):
@@ -52,15 +52,20 @@ class tle_fitter( TLE ):
         return self
 
 
-    def ephem_fit( self, dates, ephem_matrix ):
-        ''' you must initialize this TLE first or it will seed with default values'''
+    def ephem_fit( self, jds, ephem_matrix ):
+        ''' 
+        you must initialize this TLE first or it will seed with default values
+        ephem_matrix is : jd, temex, temey, temez, temedx, temedy, temedz...
+        '''
         # do the imports here so we can use the class as just a parser without these dependencies (if we want to)
         import scipy.optimize
         from sgp4.earth_gravity import wgs72
         from sgp4.io import twoline2rv
         from sgp4.propagation import sgp4 as sgprop
-        offsets = np.array( [ (D-self.epoch).total_seconds() / 60 for D in dates ] )
+
+        offsets     = 1440 * (jds - julian.to_jd(self.epoch) )
         
+        # opt closure
         def fit_fcn( X, offset_mins, true_eph ):
             self.from_array(X)
             try: 
@@ -83,7 +88,7 @@ class tle_fitter( TLE ):
                         args=( offsets, ephem_matrix) , 
                         method='Nelder-Mead',
                         options = { 
-                            'fatol' : 1. } )
+                        'fatol' : 1. } )
         print()
         if opt_result.success:
             self.from_array( opt_result.x )
@@ -105,16 +110,25 @@ if __name__ == '__main__':
     L2 = '2 43556  51.6329 154.1269 0008144 222.8163 137.2191 15.46745497242947'
     # test ephemeris
     tle = twoline2rv( L1, L2, wgs72 )
-    tledate = astropy.time.Time( tle.jdsatepoch, format='jd' )
-    print(jdcal(tledate.datetime))
+    print('tle epoch is ', julian.from_jd( tle.jdsatepoch ) )
+    tledate = julian.from_jd( tle.jdsatepoch )
     
-    dates = tledate + np.arange(0,1440*5,15) * u.min
-    mins  = (dates - tledate).to_value( u.min )
+    mins   = np.arange(0,1440*2,10)
+    jdates = tle.jdsatepoch + mins/1440
     eph = np.vstack( [np.hstack( sgprop(tle,D)) for D in mins ] )
-    FIT = tle_fitter.fromPV( eph[0,0:3], eph[0,3:], tledate.datetime )
 
-    newtle, res = FIT.ephem_fit( dates.datetime, eph ) 
+    # init as if we only had a state-vector
+    FIT = tle_fitter.fromPV( eph[0,0:3], eph[0,3:], tledate )
+    print('Init:', FIT )
+
+    # fit
+    newtle, res = FIT.ephem_fit( jdates, eph )
     print(newtle.line1)
     print(L1)
     print(newtle.line2)
     print(L2)
+
+    print()
+    print(L1)
+    print(L2)
+    print(newtle)
