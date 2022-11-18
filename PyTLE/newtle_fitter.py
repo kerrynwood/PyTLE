@@ -3,7 +3,6 @@ import numpy as np
 from RefactorTLE_working import TLE
 import julian
 
-
 class tle_fitter( TLE ):
     def __init__(self, *args, **kwargs):
         super().__init__( *args, **kwargs )
@@ -101,8 +100,6 @@ if __name__ == '__main__':
     from sgp4.earth_gravity import wgs72
     from sgp4.io import twoline2rv
     from sgp4.propagation import sgp4 as sgprop
-    import astropy.time
-    import astropy.units as u
 
 
     # Aerocube 12A
@@ -113,7 +110,7 @@ if __name__ == '__main__':
     print('tle epoch is ', julian.from_jd( tle.jdsatepoch ) )
     tledate = julian.from_jd( tle.jdsatepoch )
     
-    mins   = np.arange(0,1440*2,10)
+    mins   = np.arange(0,1440*5,10)
     jdates = tle.jdsatepoch + mins/1440
     eph = np.vstack( [np.hstack( sgprop(tle,D)) for D in mins ] )
 
@@ -122,6 +119,7 @@ if __name__ == '__main__':
     print('Init:', FIT )
 
     # fit
+    print('Fitting a new TLE to the test ephem')
     newtle, res = FIT.ephem_fit( jdates, eph )
     print(newtle.line1)
     print(L1)

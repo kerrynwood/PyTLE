@@ -220,7 +220,7 @@ if __name__=="__main__":
     L2 = '2 25544  51.6416 247.4627 0006703 130.5360 325.0288 15.72125391563537'
 
     Q = TLE.fromPV( [7000,0,0], [0,8,0.1], datetime.utcnow() )
-    for f in dir(Q): print(f,getattr(Q,f))
+
     print(Q)
 
 
