@@ -1,207 +1,132 @@
+from datetime import datetime, timedelta
 import numpy as np
-import PyTLE
-import scipy.optimize
-from sgp4.io import twoline2rv
-from sgp4.earth_gravity import wgs72
-from sgp4.propagation import sgp4 as sgp4prop
-from sgp4.ext import rv2coe
+from RefactorTLE_working import TLE
+import julian
 
+class tle_fitter( TLE ):
+    def __init__(self, *args, **kwargs):
+        super().__init__( *args, **kwargs )
+        self.allfields     = ['mean_motion','eccentricity','inclination','argp','raan','mean_anomaly',
+                               'mm_dot','mm_dot_dot','bstar']
 
-###########################################################################################
-def setDegrees( V ): return ( V.to_value(u.deg) + 360 ) % 360.
+        self.default_fields = ['mean_motion','eccentricity','inclination','argp','raan','mean_anomaly',
+                               'mm_dot','mm_dot_dot','bstar']
 
-###########################################################################################
-###########################################################################################
-class tle_fitter( PyTLE.TLE ):
-    '''
-    -  this is a helper class to allow transforming orbits to and from Poliastro and TLE
-    -  it also has routines to turn TLE into arrays for optimization
-    -  set `override_bstar` to 0 to keep bstar from fitting
-    '''
-    def __init__( self,  L1=None, L2=None, cat='NA', override_bstar = None ): 
-        super( tle_fitter, self).__init__( L1, L2, cat )
-        self.fit_range    = [0,1]
-        self.circle_range = [0,360]
-        self.ecc_range    = [1e-15,1]
-        self.mm_range     = [0, 19]
-        self.override_bstar = override_bstar
+        if 'fields' in kwargs: self._optfields = kwargs['fields']
+        else: self._optfields = self.default_fields
 
-    def fromPoliastro( self, pol ):
-        a,ecc,inc,raan,argp,nu = pol.classical()
-        # NOTE that these values have units in the AstroPy style
-        self.set_date( pol.epoch.datetime ) # set the epoch
-        self.inclination = setDegrees( inc )
-        self.eccentricity = ecc.to_value(u.one)
-        self.argument = setDegrees(argp)
-        self.mean_motion = pol.n.value * 86400. / (2*np.pi) 
-        self.ra = setDegrees(raan)
-        self.mean_anomaly = setDegrees(nu)
-        self.bstar = 0.
+    def _setup_mappers(self):
+        self._tovec = {
+            'mean_motion'   : lambda : np.interp( self.mean_motion, [0,20], [0,1] ),
+            'eccentricity'  : lambda : np.interp( self.eccentricity, [1e-15,1], [0,1]),
+            'inclination'   : lambda : np.interp( self.inclination, [0,360], [0,1] ),
+            'argp'          : lambda : np.interp( self.argp, [0,360], [0,1]),
+            'raan'          : lambda : np.interp( self.raan, [0,360], [0,1]),
+            'mean_anomaly'  : lambda : np.interp( self.mean_anomaly, [0,360], [0,1]),
+            'mm_dot'        : lambda : np.interp( self.mm_dot, [-1,1], [0,1]),
+            'mm_dot_dot'    : lambda : np.interp( self.mm_dot_dot, [-1,1], [0,1]),
+            'bstar'         : lambda : np.interp(self.bstar, [-1, 1], [0, 1])
+        }
 
-    def toArray( self ):
-        '''
-        return an array that represents the TLE orbital parameters
-        mean_motion
-        ecc
-        inclination
-        argument
-        raan
-        mean_anomaly
-        bstar  <--- return in raw form
-        '''
-        # these values should never be negative or wrapped
-        if self.override_bstar == None: bstar = self.bstar
-        else: bstar = self.override_bstar
-        return np.array( [np.interp( self.mean_motion, self.mm_range, self.fit_range ),
-                np.interp( self.eccentricity, self.ecc_range, self.fit_range ),
-                np.interp( self.inclination, self.circle_range, self.fit_range),
-                np.interp( self.argument, self.circle_range, self.fit_range),
-                np.interp( self.ra, self.circle_range, self.fit_range),
-                np.interp( self.mean_anomaly, self.circle_range, self.fit_range),
-                bstar ] )
+        self._fromvec = {
+            'mean_motion'   : lambda X: np.interp( X % 1, [0,1], [0,20] ),
+            'eccentricity'  : lambda X: np.interp( X % 1, [0,1], [1e-15,1]),
+            'inclination'   : lambda X: np.interp( X % 1, [0,1], [0,360]),
+            'argp'          : lambda X: np.interp( X % 1, [0,1], [0,360]),
+            'raan'          : lambda X: np.interp( X % 1, [0,1], [0,360]),
+            'mean_anomaly'  : lambda X: np.interp( X % 1, [0,1], [0,360]),
+            'mm_dot'        : lambda X: np.interp( X % 1, [0,1], [-1,1]),
+            'mm_dot_dot'    : lambda X: np.interp( X % 1, [0,1], [-1,1]),
+            'bstar'         : lambda X: np.interp( X % 1, [0,1], [-1,1])
+        }
 
-    def circ( self, val ):
-        return (val + self.fit_range[-1]) % self.fit_range[-1]
+    def to_array(self):
+        out = np.zeros( len(self._optfields) )
+        for i,f in enumerate(self._optfields): out[i] = getattr( self, f )
+        return out
 
-    def fromArray( self, X ):
-        '''
-        take the array mapped from toArray and turn it back into this data structure
-        mean_motion
-        ecc
-        inclination
-        argument
-        raan
-        mean_anomaly
-        bstar  <--- return in raw form
-        '''
-        # all these should be circular
-        X3 = self.circ(X[3]) # argument
-        X4 = self.circ(X[4]) # ra
-        X5 = self.circ(X[5]) # mean_anomaly
-        self.mean_motion   = np.interp( X[0], self.fit_range, self.mm_range )
-        self.eccentricity  = np.interp( X[1], self.fit_range, self.ecc_range )
-        self.inclination   = np.interp( X[2], self.fit_range, self.circle_range )
-        self.argument      = np.interp( X[3], self.fit_range, self.circle_range )
-        self.ra            = np.interp( X[4], self.fit_range, self.circle_range )
-        self.mean_anomaly  = np.interp( X[5], self.fit_range, self.circle_range )
-        if self.override_bstar != None:  self.bstar = self.override_bstar
-        else:                            self.bstar         = X[6]
+    def from_array(self, vec):
+        assert len(vec) == len(self._optfields)
+        for i,f in enumerate(self._optfields): setattr(self,f,vec[i])
         return self
 
-    def fromPV( self, P, V, epoch=None) :
+
+    def ephem_fit( self, jds, ephem_matrix ):
+        ''' 
+        you must initialize this TLE first or it will seed with default values
+        ephem_matrix is : jd, temex, temey, temez, temedx, temedy, temedz...
         '''
-        fromPV : given state position and velocity (in TEME), build an initial TLE
-        note   : this is *not* going to build mean elements
-        '''
-        # return p, a, ecc, incl, omega, argp, nu, m, arglat, truelon, lonper
-        p, a, ecc, incl, omega, argp, nu, m, arglat, truelon, lonper = rv2coe( P, V, wgs72.mu )
-        self.inclination = np.degrees( incl  )
-        self.eccentricity = ecc
-        self.argument = np.degrees( argp )
-        self.ra = np.degrees( omega )
-        self.mean_anomaly = np.degrees( m )
-        self.bstar = 0
-        # calculate the mean motion (these are km values, so we get rads/s, convert to TLE units)
-        mm = np.sqrt( wgs72.mu / a**3 )
-        self.mean_motion = ( mm * 86400 ) / (2*np.pi)
-        self.bstar = 0.
-        if epoch != None: self.set_date( epoch )
-        return self
- 
+        # do the imports here so we can use the class as just a parser without these dependencies (if we want to)
+        import scipy.optimize
+        from sgp4.earth_gravity import wgs72
+        from sgp4.io import twoline2rv
+        from sgp4.propagation import sgp4 as sgprop
 
-###########################################################################################
-def rmsval( V ):
-    try: return np.sqrt( np.mean( V ** 2 ) ) * 1e3
-    except: return np.inf
+        offsets     = 1440 * (jds - julian.to_jd(self.epoch) )
+        
+        # opt closure
+        def fit_fcn( X, offset_mins, true_eph ):
+            self.from_array(X)
+            try: 
+                testtle = twoline2rv( self.line1, self.line2, wgs72 )
+                testeph = np.vstack( [np.hstack( sgprop(testtle,D)) for D in offset_mins] )
+            except Exception as e:
+                print(e)
+                return np.inf
+            
+            diffpos = testeph[:,0:3] - true_eph[:,0:3]
+            # return the rms value
+            rmsval = np.sqrt( np.mean( np.linalg.norm(diffpos,axis=1) ** 2 ) )
+            print(rmsval,end='\r')
+            return rmsval
 
-###########################################################################################
-def compare_TLE_ephem( dates, ephem, tle_fitter, rms = False ):
-    '''
-    dates : a list of astropy.time objects
-    ephem : a list of states (TEME, km)
-        dates and ephem must be the same length
-    TLE   : (L1, L2) text lines
 
-    returns a list of residuals or rms value (depending on flag)
-    '''
-    N          = len(dates)
-    L1,L2      = tle_fitter.getLines()
-    try: prop = twoline2rv( L1, L2, wgs72 )
-    except:
-        if rms: return np.inf(N)
-        else: return np.inf
-    tle_epoch  = prop.jdsatepoch
-    offset     = np.array( [ D.jd - tle_epoch for D in dates ] ) * 1440.  # SGP4 wants minutes
-    testpos, testvel  = zip( *[sgp4prop( prop, O ) for O in offset ] )
-    rV = np.array( [ np.linalg.norm(X) for X in testpos - ephem ]  )
-    print( "{:010.2f}".format(rmsval(rV)), end='\r')
-    if rms: return rmsval( rV )
-    return rV
+        opt_result = scipy.optimize.minimize( 
+                        fit_fcn, 
+                        self.to_array(), 
+                        args=( offsets, ephem_matrix) , 
+                        method='Nelder-Mead',
+                        options = { 
+                        'fatol' : 1. } )
+        print()
+        if opt_result.success:
+            self.from_array( opt_result.x )
+            return self, opt_result
 
-###########################################################################################
-def fit_fcn( X, dates, given_ephem, tle_fitter, rms=False ):
-    tle_fitter.fromArray(X)
-    return compare_TLE_ephem( dates, given_ephem, tle_fitter, rms=rms )
+        
 
-###########################################################################################
-###########################################################################################
+# =====================================================================================================
 if __name__ == '__main__':
-    import astropy.time
-    import astropy.units as u
-    from datetime import datetime, timedelta
-    import numpy as np
+    from sgp4.earth_gravity import wgs72
+    from sgp4.io import twoline2rv
+    from sgp4.propagation import sgp4 as sgprop
 
-    # test TLE
-    L1='1 25544U 98067A   21007.32953112  .00000789  00000-0  22255-4 0  9990'
-    L2='2 25544  51.6452  58.3686 0000693 182.6292 276.9175 15.49260299263666'
-    # vanguard
-    #L1='1     5U 58002B   20320.71165500 -.00000004 +00000-0 -15140-4 0  9993'
-    #L2='2     5 034.2525 122.2981 1846950 313.0280 032.9388 10.84868096221685'
-    # make some ephemeris
-    sgpo    = twoline2rv( L1, L2, wgs72 )
-    now     = astropy.time.Time( datetime.utcnow() )
-    dates   = [now + (u.min*X) for X in range(0,1440*2,5)]
-    offsets = [ (D-now).jd * 1440 for D in dates ]
-    eph     = [ sgp4prop( sgpo, O ) for O in offsets ]
-    P,V     = zip( *eph )
-    P       = np.array(P)
 
-    # return p, a, ecc, incl, omega, argp, nu, m, arglat, truelon, lonper
-    p, a, ecc, incl, omega, argp, nu, m, arglat, truelon, lonper = rv2coe( P[0], V[0], wgs72.mu )
-    T = tle_fitter()
-    T.fromPV( P[0], V[0] )
-    T.set_date( dates[0].datetime )
-    print('-' * 80)
-    print('The initial TLE was')
+    # Aerocube 12A
+    L1 = '1 43556U 18046C   22321.55519027  .00025005  00000+0  49749-3 0  9993'
+    L2 = '2 43556  51.6329 154.1269 0008144 222.8163 137.2191 15.46745497242947'
+    # test ephemeris
+    tle = twoline2rv( L1, L2, wgs72 )
+    print('tle epoch is ', julian.from_jd( tle.jdsatepoch ) )
+    tledate = julian.from_jd( tle.jdsatepoch )
+    
+    mins   = np.arange(0,1440*5,10)
+    jdates = tle.jdsatepoch + mins/1440
+    eph = np.vstack( [np.hstack( sgprop(tle,D)) for D in mins ] )
+
+    # init as if we only had a state-vector
+    FIT = tle_fitter.fromPV( eph[0,0:3], eph[0,3:], tledate )
+    print('Init:', FIT )
+
+    # fit
+    print('Fitting a new TLE to the test ephem')
+    newtle, res = FIT.ephem_fit( jdates, eph )
+    print(newtle.line1)
+    print(L1)
+    print(newtle.line2)
+    print(L2)
+
+    print()
     print(L1)
     print(L2)
-    print('-' * 80)
-
-    print()
-    print('-' * 80)
-    print('The first guess TLE is')
-    print(T)
-    print('-' * 80)
-    print()
-    print('optimizing...')
-    
-
-    oval = scipy.optimize.minimize( fit_fcn,              # function
-                                 T.toArray(),            # initial search argument
-                                 method='Nelder-Mead',
-                                 args=( dates, P, T, True),
-                                 options = { 'disp':True, 'adaptive' : False, 'fatol':1 } )
-    if oval.success:
-        N = len(dates)
-        Z = T.fromArray( oval.x )
-        print()
-        print('-' * 80)
-        print('New TLE found:')
-        print()
-        print(Z)
-        print()
-        print('\t fit between {} and {}'.format( dates[0],dates[-1]) )
-        print('\t RMS is     : {:7.3f}'.format(oval.fun))
-        print('\t average is : {:7.3f}'.format( oval.fun / N ) )
-    else:
-        print('-------> Could not optimize')
+    print(newtle)
