@@ -191,9 +191,18 @@ class TLE:
         note   : this is *not* going to build mean elements
         '''
         # return p, a, ecc, incl, omega, argp, nu, m, arglat, truelon, lonper
-        assert V[2] != 0
-        p, a, ecc, incl, omega, argp, nu, m, arglat, truelon, lonper = rv2coe(P, V, wgs72.mu)
         newcls = cls()
+        if V[2] == 0:
+            raise Exception('cannot init an orbit with perfectly zero inclination (velocity[Z] ~ 1e-5km/s minimum)')
+            return newcls
+        try: p, a, ecc, incl, omega, argp, nu, m, arglat, truelon, lonper = rv2coe(P, V, wgs72.mu)
+        except Exception as e:
+            print('could not init TLE from P: {} V: {}'.format( P,V ) )
+            return newcls
+        # rv2coe in sgp4 returns > 999999 to indicate undefined or infinite... (see code)
+        if any( (X > 999999. for X in p,a,ecc,incl,omega,argp,nu,m,arglat,truelon,lonper ) ):
+            print('rv2coe returned undefined (> 999999) value')
+            return newcls
         newcls.inclination = np.degrees(incl)
         newcls.eccentricity = ecc
         newcls.argp = np.degrees(argp)
