@@ -60,7 +60,7 @@ def revs_per_day_from_semimajor( a ):
 # -----------------------------------------------------------------------------------------------------
 class TLE:
     def __init__(self, l1=None, l2=None, vec=None, **kwargs):
-        self._userfields = ['satnum','classification','elset_no','revnum']
+        self._userfields = ['satnum','classification','note','elset_no','revnum']
 
         if l1 and l2: 
             self.parse_line1( l1 )
@@ -143,7 +143,7 @@ class TLE:
 
 
     def _generate_new_line1( self ):
-        rV = '1 {}{:1} {:8} {:2}{:012.8f} '.format(
+        rV = '1 {}{:1} {:>8} {:2}{:012.8f} '.format(
             integer5(self.satnum),
             self.classification[0],
             self.note[:8],
@@ -185,42 +185,58 @@ class TLE:
         return newcls
 
     @classmethod
-    def fromPV(cls, P, V, epoch : datetime, **kwargs):
+    def fromCOE(cls,
+                epoch : datetime,
+                a=7000, ecc=1e-10, incl=1e-3, argp=0, raan=0, mean_anomaly=0,   # COE elements
+                bstar=0,                                                        # TLE type 0/2 only
+                **kwargs):
+        '''
+        degrees and km
+        '''
+        newcls = cls()
+        if a < 0:
+            print('cannot init from COE with semi-major axis (a) < 0')
+            return newcls
+        newcls.inclination = incl
+        newcls.eccentricity = ecc
+        newcls.argp = argp
+        newcls.raan = raan
+        newcls.mean_anomaly = mean_anomaly
+        newcls.bstar = bstar
+        # calculate the mean motion (these are km values, so we get rads/s, convert to TLE units)
+        mm = np.sqrt(wgs72.mu / a ** 3)
+        newcls.mean_motion = (mm * 86400) / (2 * np.pi)
+        newcls.bstar = bstar
+        newcls.epoch = epoch
+        # override any parameters that are in our user fields list
+        for k in kwargs:
+            print(k)
+            if k in newcls._userfields: setattr(newcls,k,kwargs[k] )
+        return newcls
+        return cls
+
+    @classmethod
+    def fromPV(self, epoch : datetime, P, V,  **kwargs):
         '''
         fromPV : given state position and velocity (in TEME), build an initial TLE
         note   : this is *not* going to build mean elements
         '''
         # return p, a, ecc, incl, omega, argp, nu, m, arglat, truelon, lonper
-        newcls = cls()
         if V[2] == 0:
             raise Exception('cannot init an orbit with perfectly zero inclination (velocity[Z] ~ 1e-5km/s minimum)')
-            return newcls
+            return self.fromCOE( epoch )
         try: p, a, ecc, incl, omega, argp, nu, m, arglat, truelon, lonper = rv2coe(P, V, wgs72.mu)
         except Exception as e:
             print('could not init TLE from P: {} V: {}'.format( P,V ) )
-            return newcls
+            return self.fromCOE( epoch )
         # rv2coe in sgp4 returns > 999999 to indicate undefined or infinite... (see code)
         if any( (X > 999999. for X in [p,a,ecc,incl,omega,argp,nu,m] ) ):
             print('rv2coe returned undefined (> 999999) value')
-            return newcls
-        if a < 0: 
-            print('rv2coe returned negative semi-major axis (hyperbolic orbit?)')
-            return newcls
-        newcls.inclination = np.degrees(incl)
-        newcls.eccentricity = ecc
-        newcls.argp = np.degrees(argp)
-        newcls.raan = np.degrees(omega)
-        newcls.mean_anomaly = np.degrees(m)
-        newcls.bstar = 0
-        # calculate the mean motion (these are km values, so we get rads/s, convert to TLE units)
-        mm = np.sqrt(wgs72.mu / a ** 3)
-        newcls.mean_motion = (mm * 86400) / (2 * np.pi)
-        newcls.bstar = 0.
-        newcls.epoch = epoch
-        # override any parameters that are in our user fields list
-        for k in kwargs:
-            if k in self._userfields: setattr(self,k,kwargs[k] )
-        return newcls
+            return self.fromCOE( epoch )
+        # a = 7000, ecc = 1e-10, incl = 1e-3, argp = 0, raan = 0, mean_anomaly = 0,
+        return self.fromCOE( epoch, a, ecc, np.degrees(incl), np.degrees(argp), np.degrees(omega), np.degrees(m),
+                             **kwargs)
+
 
     def __str__(self): return "\n".join(self.getlines())
     def __repr__(self): return str(self)
@@ -231,8 +247,13 @@ if __name__=="__main__":
     L1 = '1 25544U 98067A   08264.51782528 -.00002182  00000-0 -11606-4 0  2927'
     L2 = '2 25544  51.6416 247.4627 0006703 130.5360 325.0288 15.72125391563537'
 
-    Q = TLE.fromPV( [7000,0,0], [0,8.5,0.1], datetime.utcnow() )
-    Q = TLE.fromPV( [7000,0,0], [0,15.5,0.1], datetime.utcnow() )
+    print('Testing a random TLE generation (should generate a valid TLE)')
+    Q = TLE.fromPV( datetime.utcnow(), [7000,0,0], [0,8.5,0.1],  satnum=81234, classification='U', note='VIMP')
+    print(Q)
+    print()
+
+    print('Testing random TLE generation, this should fail and return default (99999)')
+    Q = TLE.fromPV( datetime.utcnow(), [7000,0,0], [0,15.5,0.1] )
 
     print(Q)
 
