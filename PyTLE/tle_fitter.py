@@ -101,7 +101,6 @@ if __name__ == '__main__':
     from sgp4.io import twoline2rv
     from sgp4.propagation import sgp4 as sgprop
 
-
     # Aerocube 12A
     L1 = '1 43556U 18046C   22321.55519027  .00025005  00000+0  49749-3 0  9993'
     L2 = '2 43556  51.6329 154.1269 0008144 222.8163 137.2191 15.46745497242947'

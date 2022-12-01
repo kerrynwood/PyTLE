@@ -200,8 +200,11 @@ class TLE:
             print('could not init TLE from P: {} V: {}'.format( P,V ) )
             return newcls
         # rv2coe in sgp4 returns > 999999 to indicate undefined or infinite... (see code)
-        if any( (X > 999999. for X in p,a,ecc,incl,omega,argp,nu,m,arglat,truelon,lonper ) ):
+        if any( (X > 999999. for X in [p,a,ecc,incl,omega,argp,nu,m] ) ):
             print('rv2coe returned undefined (> 999999) value')
+            return newcls
+        if a < 0: 
+            print('rv2coe returned negative semi-major axis (hyperbolic orbit?)')
             return newcls
         newcls.inclination = np.degrees(incl)
         newcls.eccentricity = ecc
@@ -228,7 +231,8 @@ if __name__=="__main__":
     L1 = '1 25544U 98067A   08264.51782528 -.00002182  00000-0 -11606-4 0  2927'
     L2 = '2 25544  51.6416 247.4627 0006703 130.5360 325.0288 15.72125391563537'
 
-    Q = TLE.fromPV( [7000,0,0], [0,8,0.1], datetime.utcnow() )
+    Q = TLE.fromPV( [7000,0,0], [0,8.5,0.1], datetime.utcnow() )
+    Q = TLE.fromPV( [7000,0,0], [0,15.5,0.1], datetime.utcnow() )
 
     print(Q)
 
