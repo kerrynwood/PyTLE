@@ -210,7 +210,6 @@ class TLE:
         newcls.epoch = epoch
         # override any parameters that are in our user fields list
         for k in kwargs:
-            print(k)
             if k in newcls._userfields: setattr(newcls,k,kwargs[k] )
         return newcls
         return cls
@@ -244,6 +243,8 @@ class TLE:
 
 # ========================================================================================================
 if __name__=="__main__":
+    from sgp4.io import twoline2rv
+    from sgp4.propagation import sgp4 as sgp4prop
     L1 = '1 25544U 98067A   08264.51782528 -.00002182  00000-0 -11606-4 0  2927'
     L2 = '2 25544  51.6416 247.4627 0006703 130.5360 325.0288 15.72125391563537'
 
@@ -254,8 +255,12 @@ if __name__=="__main__":
 
     print('Testing random TLE generation, this should fail and return default (99999)')
     Q = TLE.fromPV( datetime.utcnow(), [7000,0,0], [0,15.5,0.1] )
-
     print(Q)
+    print()
+
+    T = twoline2rv( Q.line1, Q.line2, wgs72 )
+    print(T)
+    print( sgp4prop(T,0.) )
 
 
 
