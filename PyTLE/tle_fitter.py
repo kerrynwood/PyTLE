@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 import numpy as np
-from RefactorTLE_working import TLE
-import julian
+from PyTLE import TLE
+from PyTLE import julian
 
 class tle_fitter( TLE ):
     def __init__(self, *args, **kwargs):

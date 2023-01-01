@@ -11,7 +11,10 @@
 #]
 
 #__all__ = [ "tle_class3","tle_class2"]
-from .TLE import tle_class as TLE
-from .TLE import testTLE
+#from .TLE import tle_class as TLE
+#from .TLE import testTLE
+#from .tle_fitter import fit_fcn
+
+# new TLE class of Nov/Dec 2022
+from .TLE import TLE
 from .tle_fitter import tle_fitter
-from .tle_fitter import fit_fcn
