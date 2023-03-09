@@ -2,41 +2,8 @@ from datetime import datetime, timedelta
 import re
 from alpha import alpha_to_integer, integer_to_alpha
 
-# -----------------------------------------------------------------------------------------------------
-def generate_expo_format(flt):
-    [mant, crap, exp] = '{:+4.4e}'.format(flt).partition('e')
-    mant = mant.replace('.', '')
-    rV = '{:s}{:+1d}'.format(mant, int(exp) + 1)
-    if flt == 0: return "+00000-0"
-    return rV
-
-# -----------------------------------------------------------------------------------------------------
-# this takes the "00000-0" format as specified in TLE's and outputs a float
-def process_expo_format(string):
-    if string[0] == '-': neg = -1
-    else: neg = 1
-    mant = string[1:-2]
-    exp = string[-2:]
-    return neg * float("0.{}".format(mant)) * (10 ** int(exp))
-    #return neg * float('0.%s' % mant) * (10 ** int(exp))
-
-# -----------------------------------------------------------------------------------------------------
-def epoch_str_todatetime( S ):
-    year = int(S[0:2])
-    if year > 57: tyear = datetime( year=1900+year, month=1, day=1 )
-    if year < 57: tyear = datetime( year=2000+year, month=1, day=1 )
-    frac = float( S[2:] )
-    return tyear + timedelta( days=frac )
-
-# -----------------------------------------------------------------------------------------------------
-def datetime_to_epochstr( dt ):
-    tyear = datetime(year=dt.year, day=1, month=1 )
-    frac = (dt - tyear).total_seconds() / 86400.
-    year = dt.strftime('%y')
-    ifrac = int(frac)
-    lfrac = '{}'.format( frac - ifrac )
-    return '{}{:03d}.{}'.format( year, ifrac, lfrac[2:] )[:14]
-
+from formatters import generate_expo_format, process_expo_format
+from formatters import epoch_str_todatetime, datetime_to_epochstr
 
 # -----------------------------------------------------------------------------------------------------
 class TLE:
@@ -92,19 +59,45 @@ class TLE_4( TLE ):
         #L1='1 12345U xyzzyz   23038.45547454 +.00000000 +46171+0 +33000-1 4 99992'
         L1 = '1 {:5}{:1} {:8} {:14} +.00000000 {} {} 4 {}0'.format(
                 integer_to_alpha( self._satno ).rjust(5,'0'),
-                self._class,
-                self._intld,
+                self._class[0],
+                self._intld[:8].rjust(8,' '),
                 datetime_to_epochstr( self._epoch ),
                 generate_expo_format( self.agom ),
-                generate_expo_format( 0 ), #self.B ),
+                generate_expo_format( self.B ),
                 self._elset )
         return L1
 
+    def generateLine2( self ):
+        #L2='2 12345   9.7332 113.4837 7006332 206.5371  38.9576 01.00149480000003'
+        L2 = '2 {:5} {:8} {:8} {:7} {:8} {:8} {} {}3 '.format(
+                integer_to_alpha( self._satno ).rjust(5,'0'),
+                "{:>8.4f}".format( self.incl )[:8], 
+                "{:>8.4f}".format( self.raan)[:8], 
+                "{}".format( self.ecc )[2:10],
+                "{:>8.4f}".format( self.argp)[:8], 
+                "{:>8.4f}".format( self.ma)[:8], 
+                "{:>011.8f}".format( self.mm)[:12], 
+                "{:04d}".format( self._elset)[:4]
+                )
+        return L2
+    
+    def generateLines( self ):
+        return ( self.generateLine1(), self.generateLine2() )
 
+
+
+# =====================================================================================================
 if __name__ == "__main__":
     L1='1 12345U xyzzyz   23038.45547454 +.00000000 +46171+0 +33000-1 4 99992'
     L2='2 12345   9.7332 113.4837 7006332 206.5371  38.9576 01.00149480000003'
     Q = TLE_4( L1, L2 )
     print(L1)
     print(Q.generateLine1())
+    print(L2)
+    print(Q.generateLine2())
+    Q._intld = 'hitherefromkerry'
+    Q.raan = 15000000
+    Q.agom = 10*1000000
+    print("\n".join(Q.generateLines()))
+
 

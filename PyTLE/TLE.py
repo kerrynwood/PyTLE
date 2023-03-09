@@ -2,13 +2,16 @@ import re
 import datetime
 import math
 import sys
-from . import formatExceptionInfo
 from . import tle_epoch
 from astropy.time import Time as astro_date
 from alpha import alpha5, integer5
 
 from sgp4.ext import rv2coe
 from sgp4.earth_gravity import wgs72
+
+
+from formatters import generate_expo_format, process_expo_format
+from formatters import epoch_str_todatetime, datetime_to_epochstr
 
 
 # NOTE! As of 2013/08/06, SpaceTrack is outputting records that are somewhat malformed.  Sometimes they have a non-standard NORAD identifier,
@@ -22,34 +25,6 @@ xpdotp   =  1440.0 / (2.0 *math.pi)  #  229.1831180523293
 launch_year_re = re.compile(r'(\d{2})\d{2,3} *')
 launch_number_re = re.compile(r'\d{2}(\d{2,3}) *')
 launch_piece_re = re.compile(r'\d{2}\d{2,3}.*([A-Z]{1,3})')
-
-# -----------------------------------------------------------------------------------------------------
-def generate_checksum(line):
-    digits = sum(map(lambda x: int(x), filter(
-        lambda y: re.match('[0-9]{1}', y), [z for z in line])))
-    minus = line.count('-')
-    rV = str(digits + minus)
-    return rV[-1]
-
-# -----------------------------------------------------------------------------------------------------
-def generate_expo_format(flt):
-    [mant, crap, exp] = '{:+4.4e}'.format(flt).partition('e')
-    mant = mant.replace('.', '')
-    rV = '{:s}{:+1d}'.format(mant, int(exp) + 1)
-    if flt == 0: return "+00000-0"
-    return rV
-
-# -----------------------------------------------------------------------------------------------------
-# this takes the "00000-0" format as specified in TLE's and outputs a float
-def process_expo_format(string):
-    if string[0] == '-': neg = -1
-    else: neg = 1
-    mant = string[1:-2]
-    exp = string[-2:]
-    return neg * float("0.{}".format(mant)) * (10 ** int(exp))
-    #return neg * float('0.%s' % mant) * (10 ** int(exp))
-
-
 # -----------------------------------------------------------------------------------------------------
 catDate = re.compile("([0-9]{4})_([0-9]{3})")
 def get_catalog_date(STR):
@@ -157,7 +132,6 @@ class tle_class:
             self.epoch_frac_day = self.epoch_day - self.epoch_int_day
         except:
             self._err_msg( 'unexpected error in _derive_dates')
-            formatExceptionInfo.formatExceptionInfo()
             self.error = 1
         if self.epoch_year <= 57: self.epoch_full_year = self.epoch_year + 2000
         else:   self.epoch_full_year = self.epoch_year + 1900
