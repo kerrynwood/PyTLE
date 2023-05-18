@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+import numpy as np
 
 # -----------------------------------------------------------------------------------------------------
 def generate_checksum(line):
@@ -40,9 +41,11 @@ def epoch_str_todatetime( S ):
 def datetime_to_epochstr( dt ):
     tyear = datetime(year=dt.year, day=1, month=1 )
     frac = (dt - tyear).total_seconds() / 86400.
-    year = dt.strftime('%y')
-    ifrac = int(frac)
-    lfrac = '{}'.format( frac - ifrac )
-    return '{}{:03d}.{}'.format( year, ifrac, lfrac[2:] )[:14]
+    days = int(frac)
+    decimals = frac - days 
+    decimals = '{}'.format(np.round( decimals, 8 )).split('.')[1]
+    year = dt.strftime('%y')[:2]
+    days = '{:03d}'.format(days)[:3]
+    return '{}{}.{}'.format( year, days, decimals )
 
 
