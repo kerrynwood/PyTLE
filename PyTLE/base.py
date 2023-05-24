@@ -33,6 +33,21 @@ class TLE:
         self._B       = 0.
         self._agom    = 0.
 
+        # human readable / helper
+        self._perigee = None
+        self._apogee  = None
+
+
+    @property
+    def perigee( self ):
+        if self._perigee is None: self._calculate_apogee_perigee()
+        return self._perigee
+    
+    @property
+    def apogee( self ):
+        if self._apogee is None: self._calculate_apogee_perigee()
+        return self._apogee
+
     def parseDate( self, S ):
         ''' assume this is just the date string '''
         self._epoch = epoch_str_todatetime( S )
@@ -41,6 +56,34 @@ class TLE:
     def parseLines( L1, L2 ):
         if L1[62] == '0' or L1[62] == '2' : return TLE_2( L1, L2 )
         if L1[62] == '4' : return TLE_4( L1, L2 )
+
+    @staticmethod
+    def get_type0( self ):
+        return TLE_2()
+
+    @staticmethod
+    def get_type4( self ):
+        return TLE_4()
+
+
+    def _calculate_apogee_perigee( self, earth_rad = 6378.135):
+        ''' Default value for earth_rad is taken from space-track.
+        space-track : https://www.space-track.org/documentation#/faq
+        Additional references: http://www.satobs.org/seesat/Dec-2002/0197.html
+        '''
+        semi_major = (8681663.653 / self.mean_motion) ** (2.0/3.0)
+        self.perigee = ( semi_major * (1 - self.eccentricity) ) - earth_rad
+        self.apogee =  ( semi_major * (1 + self.eccentricity) ) - earth_rad
+
+    def _calculate_apogee_perigee( self, earth_rad = 6378.135):
+        ''' Default value for earth_rad is taken from space-track.
+        space-track : https://www.space-track.org/documentation#/faq
+        Additional references: http://www.satobs.org/seesat/Dec-2002/0197.html
+        '''
+        semi_major = (8681663.653 / self.mm) ** (2.0/3.0)
+        self._perigee = ( semi_major * (1 - self.eccentricity) ) - earth_rad
+        self._apogee =  ( semi_major * (1 + self.eccentricity) ) - earth_rad
+
 
 # -----------------------------------------------------------------------------------------------------
 class TLE_2( TLE ):
