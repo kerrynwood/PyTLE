@@ -27,6 +27,7 @@ import numpy as np
 from PyTLE import TLE
 from PyTLE.utils import julian
 
+# common fields
 MAP = [
         #( human name, data struct name, range, map-to-range)
         ('mean_motion',     '_mm'       ,[0,20]     ,[0,1] ),
@@ -39,8 +40,10 @@ MAP = [
         ('n_dot_dot',       '_ndotdot'  ,[-1,1]     ,[0,1] )
         ]
 
+# for type 0/2
 MAP_T0 = MAP + [ ('Bstar','_bstar',[-1,1],[0,1] ) ]
 
+# for type 4
 MAP_T4 = MAP + [ 
         ('Bterm',           '_B',       [-1,1]      ,[0,1] ),
         ('AGOM',            '_agom',    [1e-15,100] ,[0,1] ) 

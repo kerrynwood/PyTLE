@@ -23,12 +23,15 @@
 # ###############################################################################
 
 from datetime import datetime, timedelta
-import re
-import unittest
+from sgp4.ext import rv2coe
+import numpy as np
+
 from .alpha import alpha_to_integer, integer_to_alpha
 
 from .formatters import generate_expo_format, process_expo_format
 from .formatters import epoch_str_todatetime, datetime_to_epochstr
+
+WGS84 = 398600.5
 
 # -----------------------------------------------------------------------------------------------------
 class TLE:
@@ -62,7 +65,14 @@ class TLE:
         self._perigee = None
         self._apogee  = None
 
+        # old fields
+        self._elset   = 0
 
+
+    def set_note( self, note : str ):
+        self._intld = note[:8]
+        return self
+        
     @property
     def perigee( self ):
         if self._perigee is None: self._calculate_apogee_perigee()
@@ -108,6 +118,83 @@ class TLE:
         semi_major = (8681663.653 / self.mm) ** (2.0/3.0)
         self._perigee = ( semi_major * (1 - self.eccentricity) ) - earth_rad
         self._apogee =  ( semi_major * (1 + self.eccentricity) ) - earth_rad
+
+
+    @staticmethod
+    def fromCOE(epoch : datetime,
+                type  : int = 0,
+                satno : int = 99999,
+                a=7000, ecc=1e-10, incl=1e-3, argp=0, raan=0, mean_anomaly=0,   # COE elements
+                bstar : float = 0,                                              # TLE type 0/2 only
+                bterm : float  = 0,
+                agom  : float  = 0,
+                EARTHMU : float = WGS84,
+                **kwargs):
+        '''
+        degrees and km
+        '''
+        if type == 0 or type == 2: 
+            tle = TLE_2()
+            tle._bstar = bstar
+        if type == 4 : 
+            tle = TLE_4()
+            tle._B = bterm
+            tle._agom = agom
+        if a < 0:
+            print('cannot init from COE with semi-major axis (a) < 0')
+            return tle 
+        tle._satno = satno
+        tle._incl = incl
+        tle._ecc  = ecc
+        tle._argp = argp
+        tle._raan = raan 
+        tle._ma   = mean_anomaly
+        # calculate the mean motion (these are km values, so we get rads/s, convert to TLE units)
+        mm = np.sqrt(EARTHMU / a ** 3)
+        tle._mm = (mm * 86400) / (2 * np.pi)
+        tle._epoch = epoch
+        return tle
+
+
+    @staticmethod
+    def fromPV(epoch : datetime, 
+               P : np.array,
+               V : np.array,
+               type : int = 0,
+               satno : int = 99999,
+               bstar : float = 0,                                              # TLE type 0/2 only
+               bterm : float  = 0,
+               agom  : float  = 0,
+               EARTHMU : float = WGS84,
+               **kwargs):
+        '''
+        fromPV : given state position and velocity (in TEME), build an initial TLE
+        note   : this is *not* going to build mean elements
+        '''
+        if type == 0 or type == 2: 
+            tle = TLE_2()
+            tle._bstar = bstar
+        if type == 4 : 
+            tle = TLE_4()
+            tle._B = bterm
+            tle._agom = agom
+        # return p, a, ecc, incl, omega, argp, nu, m, arglat, truelon, lonper
+        if V[2] == 0:
+            raise Exception('cannot init an orbit with perfectly zero inclination (velocity[Z] ~ 1e-5km/s minimum)')
+            return tle.fromCOE( epoch, type=type, satno=satno )
+        try: p, a, ecc, incl, omega, argp, nu, m, arglat, truelon, lonper = rv2coe(P, V, EARTHMU )
+        except Exception as e:
+            print('could not init TLE from P: {} V: {}'.format( P,V ) )
+            return tle.fromCOE( epoch, type=type, satno=satno )
+        # rv2coe in sgp4 returns > 999999 to indicate undefined or infinite... (see code)
+        if any( (X > 999999. for X in [p,a,ecc,incl,omega,argp,nu,m] ) ):
+            print('rv2coe returned undefined (> 999999) value')
+            return tle.fromCOE( epoch )
+        # a = 7000, ecc = 1e-10, incl = 1e-3, argp = 0, raan = 0, mean_anomaly = 0,
+        return tle.fromCOE( epoch, type=type, satno=satno, 
+                            a=a, ecc=ecc, incl=np.degrees(incl), argp=np.degrees(argp), omega=np.degrees(omega), m=np.degrees(m),
+                             **kwargs)
+
 
 
 # -----------------------------------------------------------------------------------------------------
@@ -320,6 +407,20 @@ def demo():
     print('Reparsing ORIGINAL and outputting dict')
     Y = TLE.parseLines( L1, L2 )
     print(Y.__dict__)
+
+    X = TLE.fromCOE( datetime.utcnow() ).set_note('fromCOE')
+    print('From COE:')
+    print('\n'.join( X.generateLines())) 
+
+    X = TLE.fromPV( datetime.utcnow(), 
+                        [7000,0,0],
+                        [0,8,0.001] 
+                  )
+                        
+    print('From PV:')
+    print('\n'.join( X.generateLines())) 
+    
+    
 
 # =====================================================================================================
 if __name__ == '__main__':
