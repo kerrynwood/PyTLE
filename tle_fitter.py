@@ -50,7 +50,10 @@ MAP_T4 = MAP + [
         ]
 
 
-class tle_fitter( TLE ):
+class tle_fitter:
+    '''
+    convenience routines to map internal TLE fields to a range an optimizer can use (generally 0--1)
+    '''
     def __init__(self, TLE : TLE ):
         self._tle = TLE
 
@@ -65,6 +68,17 @@ class tle_fitter( TLE ):
     def to_array( self ):
         return [ self._val_to_mapval(X) for X in self.get_map() ]
 
+    def from_array( self, array ):
+        # assume that order is preserved
+        MAP = self.get_map()
+        for i,M in enumerate(MAP): 
+            human, field, orig_range, new_range = M
+            # map it back to the range
+            setattr(self._tle,field,np.interp( array[i], new_range, orig_range ) )
+        return self
+
+    def __str__( self ):
+        return "\n".join( self._tle.generateLines() )
 
 def test() :
     from sgp4.earth_gravity import wgs72
@@ -74,8 +88,24 @@ def test() :
     # Aerocube 12A
     L1 = '1 43556U 18046C   22321.55519027  .00025005  00000+0  49749-3 0  9993'
     L2 = '2 43556  51.6329 154.1269 0008144 222.8163 137.2191 15.46745497242947'
+
+    # parse the TLE and wrap a fitter
+    TEST = tle_fitter( TLE.parseLines( L1, L2 ) )
+    print('Str of fitter')
+    print(str(TEST))
+
+    # get array and then parse back into structure
+    arr = TEST.to_array()
+    print('Array: {}'.format(arr))
+    print('Re-injecting...')
+    TEST.from_array( arr )
+    print(str(TEST))
+
+
+
     # test ephemeris
     tle = twoline2rv( L1, L2, wgs72 )
+    print()
     print('tle epoch is ', julian.from_jd( tle.jdsatepoch ) )
     tledate = julian.from_jd( tle.jdsatepoch )
     
@@ -83,28 +113,10 @@ def test() :
     jdates = tle.jdsatepoch + mins/1440
     eph = np.vstack( [np.hstack( sgprop(tle,D)) for D in mins ] )
 
-    TEST = tle_fitter( TLE.parseLines( L1, L2 ) )
-
-    print(TEST.to_array())
-    # init as if we only had a state-vector
-    FIT = tle_fitter.fromPV( eph[0,0:3], eph[0,3:], tledate )
-    print('Init:', FIT )
-
-    # fit
-    print('Fitting a new TLE to the test ephem')
-    newtle, res = FIT.ephem_fit( jdates, eph )
-    print(newtle.line1)
-    print(L1)
-    print(newtle.line2)
-    print(L2)
-
+        # init as if we only had a state-vector
+    FIT = tle_fitter(TLE.fromPV( epoch=tledate, P=eph[0,0:3], V=eph[0,3:] ) )
     print()
-    print(L1)
-    print(L2)
-    print(newtle)
-
-
-
+    print( str(FIT) )
 
 
 # =====================================================================================================
