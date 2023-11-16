@@ -69,6 +69,57 @@ class TLE:
         self._elset   = 0
 
 
+    @property
+    def inclination( self ): return self._incl
+
+    @inclination.setter
+    def inclination( self, incl ):
+        self._incl = (incl + 180) % 180
+
+    @property
+    def RAAN( self ) : return self._raan
+
+    @RAAN.setter
+    def RAAN( self, raan ):
+        self._raan = (raan + 360) % 360
+
+    @property 
+    def eccentricity( self ): return self._ecc
+
+    @eccentricity.setter
+    def eccentricity( self, ecc ):
+        self._ecc = np.clip( ecc, 0, 1 )
+
+    @property 
+    def arg_perigee( self ): return self._argp
+    @arg_perigee.setter
+    def arg_perigee( self, argp ):
+        self._argp = (argp+ 360) % 360
+
+    @property 
+    def mean_anomaly( self ) : return self._ma
+    @mean_anomaly.setter
+    def mean_anomaly( self, ma ):
+        self._ma = (ma + 360) % 360
+
+    @property 
+    def mean_motion( self ) : return self._mm
+    # TODO: add some error checking here
+    @mean_motion.setter
+    def mean_motion( self, mm ): self._mm = mm
+
+    @property
+    def B( self ): return self._B
+    @B.setter
+    def B(self, newB ) : 
+        self._B = newB
+
+    @property
+    def AGOM( self ) : return self._agom
+    @AGOM.setter
+    def AGOM( self, agom ):
+        self._agom = agom
+
     def set_note( self, note : str ):
         self._intld = note[:8]
         return self
@@ -194,6 +245,12 @@ class TLE:
         return tle.fromCOE( epoch, type=type, satno=satno, 
                             a=a, ecc=ecc, incl=np.degrees(incl), argp=np.degrees(argp), omega=np.degrees(omega), m=np.degrees(m),
                              **kwargs)
+
+
+    def __str__( self ): return '\n'.join( self.generateLines() )
+    
+    def __repr__( self ): return str(self)
+
 
 
 
