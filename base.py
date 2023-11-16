@@ -97,7 +97,7 @@ class TLE:
         return TLE_2()
 
     @staticmethod
-    def get_type4( self ):
+    def get_type4( ):
         return TLE_4()
 
 
@@ -302,19 +302,20 @@ class TLE_4( TLE ):
 
     def generateLine1( self ):
         #L1='1 12345U xyzzyz   23038.45547454 +.00000000 +46171+0 +33000-1 4 99992'
-        L1 = '1 {:5}{:1} {:8} {:14} +.00000000 {} {} 4 {}0'.format(
+        L1 = '1 {:5}{:1} {:8} {:14} +.00000000 {} {} 4 {}'.format(
                 integer_to_alpha( self._satno ).rjust(5,'0'),
                 self._class[0],
                 self._intld[:8].rjust(8,' '),
                 datetime_to_epochstr( self._epoch ),
                 generate_expo_format( self._agom ),
                 generate_expo_format( self._B ),
-                self._elset )
+                "{:d}".format( self._elset).rjust(4,'0')[-4:]
+                 )
         return L1
 
     def generateLine2( self ):
         #L2='2 12345   9.7332 113.4837 7006332 206.5371  38.9576 01.00149480000003'
-        L2 = '2 {:5} {:8} {:8} {:7} {:8} {:8} {} {}3 '.format(
+        L2 = '2 {:5} {:8} {:8} {:7} {:8} {:8} {} {}'.format(
                 integer_to_alpha( self._satno ).rjust(5,'0'),
                 "{:>8.4f}".format( self._incl )[:8], 
                 "{:>8.4f}".format( self._raan)[:8], 
@@ -322,7 +323,7 @@ class TLE_4( TLE ):
                 "{:>8.4f}".format( self._argp)[:8], 
                 "{:>8.4f}".format( self._ma)[:8], 
                 "{:>011.8f}".format( self._mm)[:12], 
-                "{:04d}".format( self._elset)[:4]
+                "{:d}".format( self._elset).rjust(4,'0')[-4:]
                 )
         return L2
     
