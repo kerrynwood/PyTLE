@@ -50,7 +50,7 @@ MAP_T4 = MAP + [
         ]
 
 
-class tle_fitter:
+class tle_fitter( TLE ):
     '''
     convenience routines to map internal TLE fields to a range an optimizer can use (generally 0--1)
     '''
@@ -77,8 +77,21 @@ class tle_fitter:
             setattr(self._tle,field,np.interp( array[i], new_range, orig_range ) )
         return self
 
+    def testme( self, **kwargs ):
+        print(kwargs)
+
+    @staticmethod
+    def parseLines( L1, L2 ):
+        return tle_fitter( TLE.parseLines(L1,L2) )
+
     def __str__( self ):
         return "\n".join( self._tle.generateLines() )
+    
+    def generateLine1( self ):
+        return self._tle.generateLine1() 
+
+    def generateLine2( self ):
+        return self._tle.generateLine2() 
 
 def test() :
     from sgp4.earth_gravity import wgs72

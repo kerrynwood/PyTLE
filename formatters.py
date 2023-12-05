@@ -71,5 +71,3 @@ def datetime_to_epochstr( dt ):
     year = dt.strftime('%y')[:2]
     days = '{:03d}'.format(days)[:3]
     return '{}{}.{}'.format( year, days, decimals )
-
-

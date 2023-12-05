@@ -34,6 +34,10 @@ from .formatters import epoch_str_todatetime, datetime_to_epochstr
 WGS84 = 398600.5
 
 # -----------------------------------------------------------------------------------------------------
+def format_ecc( ecc ):
+    return '{:9.7f}'.format(ecc)[2:].ljust(7,'0')
+
+# -----------------------------------------------------------------------------------------------------
 class TLE:
     def __init__( self ):
         self.clear()
@@ -313,7 +317,8 @@ class TLE_2( TLE ):
                 integer_to_alpha( self._satno ).rjust(5,'0'),
                 "{:>8.4f}".format( self._incl )[:8], 
                 "{:>8.4f}".format( self._raan)[:8], 
-                "{}".format( self._ecc )[2:10],
+                #"{}".format( self._ecc )[2:10],
+                format_ecc( self._ecc ),
                 "{:>8.4f}".format( self._argp)[:8], 
                 "{:>8.4f}".format( self._ma)[:8], 
                 "{:>011.8f}".format( self._mm)[:12], 
@@ -376,7 +381,8 @@ class TLE_4( TLE ):
                 integer_to_alpha( self._satno ).rjust(5,'0'),
                 "{:>8.4f}".format( self._incl )[:8], 
                 "{:>8.4f}".format( self._raan)[:8], 
-                "{}".format( self._ecc )[2:10],
+                #"{}".format( self._ecc )[2:10],
+                format_ecc( self._ecc ),
                 "{:>8.4f}".format( self._argp)[:8], 
                 "{:>8.4f}".format( self._ma)[:8], 
                 "{:>011.8f}".format( self._mm)[:12], 
