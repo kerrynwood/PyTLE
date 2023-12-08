@@ -25,14 +25,25 @@
 from datetime import datetime, timedelta
 import numpy as np
 from PyTLE import TLE
+
+# -------------------------------------------------------------
+#def generate_fake_GEO( ):
+#    YEAR_DAY = datetime.utcnow().strftime('%y%j')
+#    GEOL1 = '1 00001U SYNTGEO  {}.00000000  .00000000  00000+0  00000+0 0  9999'.format( YEAR_DAY )
+#    GEOL2 = '2 00001   0.0000 000.0000 0002168 000.0000 000.0000  1.00270000  9999'
+#    GEO_epoch = datetime.strptime( YEAR_DAY,'%y%j' )
+#    return GEOL1, GEOL2
+
 from PyTLE.utils import julian
 
 # common fields
+# TODO
+# NOTE: in from_array below, we assume that the new range is 0-1 (modulo operator), this should be fixed if we want this to be variable
 MAP = [
         #( human name, data struct name, range, map-to-range)
         ('mean_motion',     '_mm'       ,[0,20]     ,[0,1] ),
         ('eccentricity',    '_ecc'      ,[1e-15,1]  ,[0,1] ),
-        ('inclination',     '_incl'     ,[0,360]    ,[0,1] ),
+        ('inclination',     '_incl'     ,[0,180]    ,[0,1] ),
         ('argp',            '_argp'     ,[0,360]    ,[0,1] ),
         ('raan',            '_raan'     ,[0,360]    ,[0,1] ),
         ('mean_anomaly',    '_ma'       ,[0,360]    ,[0,1] ),
@@ -57,6 +68,15 @@ class tle_fitter( TLE ):
     def __init__(self, TLE : TLE ):
         self._tle = TLE
 
+    @property
+    def satno( self ): return self._tle.satno
+
+    @satno.setter
+    def satno( self, newno ) : 
+        # TODO : support for alpha
+        assert newno > 0 and newno < 99999
+        self._tle.satno = newno
+
     def get_map( self ):
         if self._tle._type == 0 or self._tle._type == 2: return MAP_T0
         if self._tle._type == 4 : return MAP_T4
@@ -68,13 +88,20 @@ class tle_fitter( TLE ):
     def to_array( self ):
         return [ self._val_to_mapval(X) for X in self.get_map() ]
 
-    def from_array( self, array ):
+    def map_names( self ):
+        names = [ X[0] for X in self.get_map() ]
+        return { X:Y  for X,Y in enumerate(names) }
+
+    def from_array( self, array, note=None, satno=None ):
         # assume that order is preserved
         MAP = self.get_map()
         for i,M in enumerate(MAP): 
             human, field, orig_range, new_range = M
             # map it back to the range
-            setattr(self._tle,field,np.interp( array[i], new_range, orig_range ) )
+            val = (array[i] + 1) % 1   # <---- TODO: this should auto-range, assumed 1 for now 
+            setattr(self._tle,field,np.interp( val, new_range, orig_range ) )
+        if satno : self._tle.satno = satno
+        if note  : self._tle.set_note( note )
         return self
 
     def testme( self, **kwargs ):
@@ -113,6 +140,11 @@ def test() :
     print('Re-injecting...')
     TEST.from_array( arr )
     print(str(TEST))
+
+    print('Modifying entries and re-injecting (wrap test)')
+    N = len(arr)
+    mod =arr + np.ones(N) * 0.7
+    print( TEST.from_array( mod ) ) 
 
 
 

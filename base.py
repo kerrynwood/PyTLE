@@ -72,6 +72,14 @@ class TLE:
         # old fields
         self._elset   = 0
 
+    @property
+    def satno( self ): return self._satno
+
+    @satno.setter
+    def satno( self, newno ) : 
+        # TODO : support for alpha
+        assert newno > 0 and newno < 99999
+        self._satno = newno
 
     @property
     def inclination( self ): return self._incl
