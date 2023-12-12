@@ -65,11 +65,11 @@ class tle_fitter( PyTLE.TLE ):
     '''
     convenience routines to map internal TLE fields to a range an optimizer can use (generally 0--1)
     '''
-    def __init__(self, inTLE : PyTLE.TLE = None , tletype : int = 2):
+    def __init__(self, inTLE : PyTLE.TLE = None , tletype : int = 0):
         if inTLE is None:
-            if type == 2 : self._tle = PyTLE.TLE_2()
-            if type == 4 : self._tle = PyTLE.TLE_4()
-        self._tle = inTLE
+            if tletype == 0 : self._tle = PyTLE.TLE.get_type0()
+            if tletype == 4 : self._tle = PyTLE.TLE.get_type4()
+        else: self._tle = inTLE
 
     @property
     def satno( self ): return self._tle.satno
