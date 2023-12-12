@@ -31,7 +31,10 @@ from .alpha import alpha_to_integer, integer_to_alpha
 from .formatters import generate_expo_format, process_expo_format
 from .formatters import epoch_str_todatetime, datetime_to_epochstr
 
-WGS84 = 398600.5
+WGS84  = 398600.5
+gL1    = '1 25544U 98067A   23137.83559306  .00011914  00000-0  21418-3 0  9990'
+gL2    = '2 25544  51.6409 118.9691 0006630 359.0829  72.4864 15.50282135397083'
+gEPOCH = datetime.fromisoformat('2000-01-01T00:00:00.000') 
 
 # -----------------------------------------------------------------------------------------------------
 def format_ecc( ecc ):
@@ -39,17 +42,17 @@ def format_ecc( ecc ):
 
 # -----------------------------------------------------------------------------------------------------
 class TLE:
-    def __init__( self ):
+    def __init__(self, L1=None, L2=None):
         self.clear()
 
     def clear( self ):
-        self._epoch = None
+        self._epoch = gEPOCH
         self._line1 = None
         self._line2 = None
-        self._satno = None
+        self._satno = 99999
         self._class = 'U'
         self._intld = ''
-        self._elset = None
+        self._elset = 9999
         self._incl    = 0.
         self._raan    = 0.
         self._ecc     = 0.
@@ -71,6 +74,13 @@ class TLE:
 
         # old fields
         self._elset   = 0
+
+    @property
+    def epoch( self ): return self._epoch
+
+    @epoch.setter
+    def epoch( self, epoch ):
+        self._epoch = datetime.fromisoformat( epoch )
 
     @property
     def satno( self ): return self._satno
@@ -156,7 +166,7 @@ class TLE:
         if L1[62] == '4' : return TLE_4( L1, L2 )
 
     @staticmethod
-    def get_type0( self ):
+    def get_type0( ):
         return TLE_2()
 
     @staticmethod
@@ -268,10 +278,6 @@ class TLE:
 
 # -----------------------------------------------------------------------------------------------------
 class TLE_2( TLE ):
-    """
-    1 25544U 98067A   23137.83559306  .00011914  00000-0  21418-3 0  9990
-    2 25544  51.6409 118.9691 0006630 359.0829  72.4864 15.50282135397083
-    """
     def __init__(self, L1=None, L2=None):
         self.clear()
         if L1 and L2: self.parseLines(L1,L2)

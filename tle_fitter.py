@@ -24,7 +24,7 @@
 
 from datetime import datetime, timedelta
 import numpy as np
-from PyTLE import TLE
+import PyTLE
 
 # -------------------------------------------------------------
 #def generate_fake_GEO( ):
@@ -61,12 +61,15 @@ MAP_T4 = MAP + [
         ]
 
 
-class tle_fitter( TLE ):
+class tle_fitter( PyTLE.TLE ):
     '''
     convenience routines to map internal TLE fields to a range an optimizer can use (generally 0--1)
     '''
-    def __init__(self, TLE : TLE ):
-        self._tle = TLE
+    def __init__(self, inTLE : PyTLE.TLE = None , tletype : int = 2):
+        if inTLE is None:
+            if type == 2 : self._tle = PyTLE.TLE_2()
+            if type == 4 : self._tle = PyTLE.TLE_4()
+        self._tle = inTLE
 
     @property
     def satno( self ): return self._tle.satno
@@ -109,7 +112,7 @@ class tle_fitter( TLE ):
 
     @staticmethod
     def parseLines( L1, L2 ):
-        return tle_fitter( TLE.parseLines(L1,L2) )
+        return tle_fitter( PyTLE.TLE.parseLines(L1,L2) )
 
     def __str__( self ):
         return "\n".join( self._tle.generateLines() )
@@ -130,7 +133,7 @@ def test() :
     L2 = '2 43556  51.6329 154.1269 0008144 222.8163 137.2191 15.46745497242947'
 
     # parse the TLE and wrap a fitter
-    TEST = tle_fitter( TLE.parseLines( L1, L2 ) )
+    TEST = tle_fitter( PyTLE.TLE.parseLines( L1, L2 ) )
     print('Str of fitter')
     print(str(TEST))
 
