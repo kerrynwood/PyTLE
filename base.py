@@ -80,7 +80,8 @@ class TLE:
 
     @epoch.setter
     def epoch( self, epoch ):
-        self._epoch = datetime.fromisoformat( epoch )
+        if isinstance(epoch,str)      : self._epoch = datetime.fromisoformat( epoch )
+        if isinstance(epoch,datetime) : self._epoch = epoch
 
     @property
     def satno( self ): return self._satno

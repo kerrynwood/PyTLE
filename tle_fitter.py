@@ -52,15 +52,23 @@ MAP = [
         ]
 
 # for type 0/2
-MAP_T0 = MAP + [ ('Bstar','_bstar',[-1,1],[0,1] ) ]
+MAP_T0  = MAP + [ ('Bstar','_bstar',[-1,1],[0,1] ) ]
+NAME_T0 = { X[0] : i for i,X in enumerate(MAP_T0) }
+POS_T0  = { i : X[0] for i,X in enumerate(MAP_T0) }
+N_T0    = len(MAP_T0)
 
 # for type 4
 MAP_T4 = MAP + [ 
         ('Bterm',           '_B',       [-1,1]      ,[0,1] ),
         ('AGOM',            '_agom',    [1e-15,100] ,[0,1] ) 
         ]
+NAME_T4 = { X[0] : i for i,X in enumerate(MAP_T4) }
+POS_T4  = { i : X[0] for i,X in enumerate(MAP_T4) }
+N_T4    = len(MAP_T4)
 
 
+
+# -----------------------------------------------------------------------------------------------------
 class tle_fitter( PyTLE.TLE ):
     '''
     convenience routines to map internal TLE fields to a range an optimizer can use (generally 0--1)
@@ -70,6 +78,13 @@ class tle_fitter( PyTLE.TLE ):
             if tletype == 0 : self._tle = PyTLE.TLE.get_type0()
             if tletype == 4 : self._tle = PyTLE.TLE.get_type4()
         else: self._tle = inTLE
+
+    @property 
+    def epoch( self ): return self._tle.epoch
+    
+    @epoch.setter
+    def epoch( self, epoch ): self._tle.epoch = epoch
+
 
     @property
     def satno( self ): return self._tle.satno
@@ -91,11 +106,37 @@ class tle_fitter( PyTLE.TLE ):
     def to_array( self ):
         return [ self._val_to_mapval(X) for X in self.get_map() ]
 
-    def map_names( self ):
-        names = [ X[0] for X in self.get_map() ]
-        return { X:Y  for X,Y in enumerate(names) }
+    def name_to_pos( self ):
+        if self._tle._type == 0 or self._tle._type == 2: return NAME_T0
+        if self._tle._type == 4 : return NAME_T4 
+    
+    def pos_to_name( self ):
+        if self._tle._type == 0 or self._tle._type == 2: return POS_T0
+        if self._tle._type == 4 : return POS_T4
 
-    def from_array( self, array, note=None, satno=None ):
+    def get_fields( self, fields ):
+        A      = self.to_array()
+        N2P    = self.name_to_pos()
+        return [ A[ N2P[F] ] for F in fields ]
+
+    def set_fields( self, fields, arr ):
+        assert len(arr) == len(fields)
+        A      = self.to_array()
+        lookup = self.name_to_pos()
+        for fname, val in zip( fields, arr ):
+            A[ lookup[fname] ] = val
+        self.from_array( A )
+            
+
+    def set_dict( self,  arr_dict ):
+        ''' arr_dict = {'mean_motion' : 0.3, 'inclination' : 0.1...} '''
+        A      = self.to_array()
+        lookup = self.name_to_pos()
+        for k,v in arr_dict.items():
+            A[ lookup[k] ] = v
+        self.from_array( A )
+
+    def from_array( self, array, note=None, satno=None, epoch=None ):
         # assume that order is preserved
         MAP = self.get_map()
         for i,M in enumerate(MAP): 
@@ -105,6 +146,7 @@ class tle_fitter( PyTLE.TLE ):
             setattr(self._tle,field,np.interp( val, new_range, orig_range ) )
         if satno : self._tle.satno = satno
         if note  : self._tle.set_note( note )
+        if epoch : self._tle.epoch = epoch
         return self
 
     def testme( self, **kwargs ):
@@ -122,6 +164,10 @@ class tle_fitter( PyTLE.TLE ):
 
     def generateLine2( self ):
         return self._tle.generateLine2() 
+    
+    def generateLines( self ):
+        return self._tle.generateLines() 
+
 
 def test() :
     from sgp4.earth_gravity import wgs72
