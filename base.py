@@ -282,6 +282,7 @@ class TLE_2( TLE ):
     def __init__(self, L1=None, L2=None):
         self.clear()
         if L1 and L2: self.parseLines(L1,L2)
+        self._type = 0
 
     def parseLine1( self, S ):
         if S[0] != '1' : raise Exception('LINE1 must begin with 1')
@@ -351,6 +352,7 @@ class TLE_4( TLE ):
     def __init__(self, L1=None, L2=None):
         self.clear()
         if L1 and L2: self.parseLines(L1,L2)
+        self._type = 4
 
     def parseLine1( self, S ):
         if S[0] != '1' : raise Exception('LINE1 must begin with 1')

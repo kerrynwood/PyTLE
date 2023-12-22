@@ -79,12 +79,19 @@ class tle_fitter( PyTLE.TLE ):
             if tletype == 4 : self._tle = PyTLE.TLE.get_type4()
         else: self._tle = inTLE
 
+    def get_type4( self ):
+        self._tle = PyTLE.TLE.get_type4()
+        return self
+
     @property 
     def epoch( self ): return self._tle.epoch
     
     @epoch.setter
     def epoch( self, epoch ): self._tle.epoch = epoch
 
+    def set_epoch( self, epoch ):
+        self._tle.epoch = epoch
+        return self
 
     @property
     def satno( self ): return self._tle.satno
@@ -95,6 +102,14 @@ class tle_fitter( PyTLE.TLE ):
         assert newno > 0 and newno < 99999
         self._tle.satno = newno
 
+    def set_satno( self, satno ):
+        self._tle.satno = satno
+        return self
+
+    def set_note( self, note ):
+        self._tle.set_note( note )
+        return self
+
     def get_map( self ):
         if self._tle._type == 0 or self._tle._type == 2: return MAP_T0
         if self._tle._type == 4 : return MAP_T4
@@ -104,7 +119,7 @@ class tle_fitter( PyTLE.TLE ):
         return np.interp( getattr(self._tle,field), orig_range, new_range )
 
     def to_array( self ):
-        return [ self._val_to_mapval(X) for X in self.get_map() ]
+        return np.array( [ self._val_to_mapval(X) for X in self.get_map() ] )
 
     def name_to_pos( self ):
         if self._tle._type == 0 or self._tle._type == 2: return NAME_T0
@@ -117,24 +132,29 @@ class tle_fitter( PyTLE.TLE ):
     def get_fields( self, fields ):
         A      = self.to_array()
         N2P    = self.name_to_pos()
-        return [ A[ N2P[F] ] for F in fields ]
+        return np.array( [ A[ N2P[F] ] for F in fields ] )
 
-    def set_fields( self, fields, arr ):
+    def from_fields( self, fields, arr ):
         assert len(arr) == len(fields)
         A      = self.to_array()
         lookup = self.name_to_pos()
         for fname, val in zip( fields, arr ):
             A[ lookup[fname] ] = val
         self.from_array( A )
+        return self
             
-
-    def set_dict( self,  arr_dict ):
+    def from_dict( self,  arr_dict ):
         ''' arr_dict = {'mean_motion' : 0.3, 'inclination' : 0.1...} '''
         A      = self.to_array()
         lookup = self.name_to_pos()
         for k,v in arr_dict.items():
             A[ lookup[k] ] = v
         self.from_array( A )
+        return self
+
+    def to_dict( self ):
+        A = self.to_array()
+        return { X[0] : A[i] for i,X in enumerate( self.get_map() ) }
 
     def from_array( self, array, note=None, satno=None, epoch=None ):
         # assume that order is preserved
