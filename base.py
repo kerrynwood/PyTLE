@@ -245,27 +245,23 @@ class TLE:
         fromPV : given state position and velocity (in TEME), build an initial TLE
         note   : this is *not* going to build mean elements
         '''
-        if type == 0 or type == 2: 
-            tle = TLE_2()
-            tle._bstar = bstar
-        if type == 4 : 
-            tle = TLE_4()
-            tle._B = bterm
-            tle._agom = agom
         # return p, a, ecc, incl, omega, argp, nu, m, arglat, truelon, lonper
         if V[2] == 0:
             raise Exception('cannot init an orbit with perfectly zero inclination (velocity[Z] ~ 1e-5km/s minimum)')
             return tle.fromCOE( epoch, type=type, satno=satno )
+
         try: p, a, ecc, incl, omega, argp, nu, m, arglat, truelon, lonper = rv2coe(P, V, EARTHMU )
         except Exception as e:
             print('could not init TLE from P: {} V: {}'.format( P,V ) )
             return tle.fromCOE( epoch, type=type, satno=satno )
+
         # rv2coe in sgp4 returns > 999999 to indicate undefined or infinite... (see code)
         if any( (X > 999999. for X in [p,a,ecc,incl,omega,argp,nu,m] ) ):
             print('rv2coe returned undefined (> 999999) value')
-            return tle.fromCOE( epoch )
+            return tle.fromCOE( epoch , type=type)
+
         # a = 7000, ecc = 1e-10, incl = 1e-3, argp = 0, raan = 0, mean_anomaly = 0,
-        return tle.fromCOE( epoch, type=type, satno=satno, 
+        return TLE.fromCOE( epoch, type=type, satno=satno, 
                             a=a, ecc=ecc, incl=np.degrees(incl), argp=np.degrees(argp), omega=np.degrees(omega), m=np.degrees(m),
                              **kwargs)
 
@@ -495,7 +491,8 @@ def demo():
 
     X = TLE.fromPV( datetime.utcnow(), 
                         [7000,0,0],
-                        [0,8,0.001] 
+                        [0,8,0.001] ,
+                        type = 4
                   )
                         
     print('From PV:')
