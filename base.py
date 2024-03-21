@@ -179,7 +179,7 @@ class TLE:
         ''' Default value for earth_rad is taken from space-track.
         space-track : https://www.space-track.org/documentation#/faq
         Additional references: http://www.satobs.org/seesat/Dec-2002/0197.html
-        '''
+        [I192G'''
         semi_major = (8681663.653 / self.mean_motion) ** (2.0/3.0)
         self.perigee = ( semi_major * (1 - self.eccentricity) ) - earth_rad
         self.apogee =  ( semi_major * (1 + self.eccentricity) ) - earth_rad
@@ -189,7 +189,7 @@ class TLE:
         space-track : https://www.space-track.org/documentation#/faq
         Additional references: http://www.satobs.org/seesat/Dec-2002/0197.html
         '''
-        semi_major = (8681663.653 / self.mm) ** (2.0/3.0)
+        semi_major = (8681663.653 / self.mean_motion) ** (2.0/3.0)
         self._perigee = ( semi_major * (1 - self.eccentricity) ) - earth_rad
         self._apogee =  ( semi_major * (1 + self.eccentricity) ) - earth_rad
 
@@ -248,22 +248,33 @@ class TLE:
         # return p, a, ecc, incl, omega, argp, nu, m, arglat, truelon, lonper
         if V[2] == 0:
             raise Exception('cannot init an orbit with perfectly zero inclination (velocity[Z] ~ 1e-5km/s minimum)')
-            return TLE.fromCOE( epoch, type=type, satno=satno )
+            return tle.fromCOE( epoch, type=type, satno=satno )
 
         try: p, a, ecc, incl, omega, argp, nu, m, arglat, truelon, lonper = rv2coe(P, V, EARTHMU )
         except Exception as e:
             print('could not init TLE from P: {} V: {}'.format( P,V ) )
-            return TLE.fromCOE( epoch, type=type, satno=satno )
+            return tle.fromCOE( epoch, type=type, satno=satno )
 
         # rv2coe in sgp4 returns > 999999 to indicate undefined or infinite... (see code)
         if any( (X > 999999. for X in [p,a,ecc,incl,omega,argp,nu,m] ) ):
             print('rv2coe returned undefined (> 999999) value')
-            return TLE.fromCOE( epoch , type=type)
+            print([p,a,ecc,incl,omega,argp,nu,m] )
+            return tle.fromCOE( epoch , type=type)
 
         # a = 7000, ecc = 1e-10, incl = 1e-3, argp = 0, raan = 0, mean_anomaly = 0,
-        return TLE.fromCOE( epoch, type=type, satno=satno, 
-                            a=a, ecc=ecc, incl=np.degrees(incl), argp=np.degrees(argp), omega=np.degrees(omega), m=np.degrees(m),
-                             **kwargs)
+        return TLE.fromCOE( epoch, 
+                type=type, 
+                satno=satno, 
+                a=a, 
+                ecc=ecc, 
+                incl=np.degrees(incl), 
+                argp=np.degrees(argp), 
+                raan=np.degrees(omega), 
+                mean_anomaly=np.degrees(m),
+                bstar = bstar,
+                bterm = bterm,
+                agom  = agom,
+                EARTHMU = EARTHMU)
 
 
     def __str__( self ): return '\n'.join( self.generateLines() )
@@ -408,6 +419,9 @@ class TLE_4( TLE ):
 
 # -----------------------------------------------------------------------------------------------------
 def demo():
+    from sgp4.io import twoline2rv
+    from sgp4.earth_gravity import wgs72
+    from sgp4.propagation import sgp4 as sgprop
     L1='1 12345U xyzzyz   23038.45547454 +.00000000 +46171+0 +33000-1 4 99992'
     L2='2 12345   9.7332 113.4837 7006332 206.5371  38.9576 01.00149480000003'
 
@@ -489,14 +503,17 @@ def demo():
     print('From COE:')
     print('\n'.join( X.generateLines())) 
 
-    X = TLE.fromPV( datetime.utcnow(), 
-                        [7000,0,0],
-                        [0,8,0.001] ,
-                        type = 4
-                  )
+    P = [9000,0,0]
+    V = [0,8,0.001]
+    print('\nFrom P: {} V: {}'.format( P, V ))
+    X = TLE.fromPV( datetime.utcnow(), P, V,
+                        type = 0 )
                         
-    print('From PV:')
-    print('\n'.join( X.generateLines())) 
+    L1,L2 = X.generateLines()
+    print(L1)
+    print(L2)
+    T = twoline2rv(L1,L2,wgs72)
+    print('Repropagated to epoch: {}'.format( sgprop(T,0)) )
     
     
 

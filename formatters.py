@@ -36,11 +36,11 @@ def generate_checksum(line):
 
 # -----------------------------------------------------------------------------------------------------
 def generate_expo_format(flt):
+    if np.abs(flt) < 9.9999e-9: return "+00000-0"
     [mant, crap, exp] = '{:+4.4e}'.format(flt).partition('e')
     mant = mant.replace('.', '')
     if abs(int(exp)) > 9 : raise Exception('exponent is too large to express')
     rV = '{:s}{:+1d}'.format(mant, int(exp) + 1)
-    if flt == 0: return "+00000-0"
     return rV
 
 # -----------------------------------------------------------------------------------------------------
