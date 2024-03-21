@@ -248,18 +248,18 @@ class TLE:
         # return p, a, ecc, incl, omega, argp, nu, m, arglat, truelon, lonper
         if V[2] == 0:
             raise Exception('cannot init an orbit with perfectly zero inclination (velocity[Z] ~ 1e-5km/s minimum)')
-            return tle.fromCOE( epoch, type=type, satno=satno )
+            return TLE.fromCOE( epoch, type=type, satno=satno )
 
         try: p, a, ecc, incl, omega, argp, nu, m, arglat, truelon, lonper = rv2coe(P, V, EARTHMU )
         except Exception as e:
             print('could not init TLE from P: {} V: {}'.format( P,V ) )
-            return tle.fromCOE( epoch, type=type, satno=satno )
+            return TLE.fromCOE( epoch, type=type, satno=satno )
 
         # rv2coe in sgp4 returns > 999999 to indicate undefined or infinite... (see code)
         if any( (X > 999999. for X in [p,a,ecc,incl,omega,argp,nu,m] ) ):
             print('rv2coe returned undefined (> 999999) value')
             print([p,a,ecc,incl,omega,argp,nu,m] )
-            return tle.fromCOE( epoch , type=type)
+            return TLE.fromCOE( epoch , type=type)
 
         # a = 7000, ecc = 1e-10, incl = 1e-3, argp = 0, raan = 0, mean_anomaly = 0,
         return TLE.fromCOE( epoch, 

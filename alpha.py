@@ -48,3 +48,12 @@ def integer_to_alpha(I):
     return to_alpha[ int(lkup) ] + intstr[2:][0:5]
 
 
+def test_xform():
+    test_i = range(1,340000,100)
+    for i in test_i: 
+         alpha = integer_to_alpha(i)
+         intg  = alpha_to_integer( alpha )
+         print(i,alpha,intg)
+
+if __name__ == '__main__':
+        test_xform()
